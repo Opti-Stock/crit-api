@@ -1,0 +1,12 @@
+services:
+  crit-api:
+    build: .
+    container_name: crit-api
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
