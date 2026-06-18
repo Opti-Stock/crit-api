@@ -147,13 +147,15 @@ attendance/
 
 ## Conexión a PostgreSQL
 
-Se usará `pg` con pool de conexiones.
+Se usa `pg` con un pool de conexiones reutilizable.
 
-Archivo esperado en implementación:
+Configuración:
 
 ```txt
 src/config/db.ts
 ```
+
+Las variables de entorno se cargan y validan en `src/config/env.ts`. Importar el pool no abre una conexión; PostgreSQL se contacta cuando un repositorio ejecuta una consulta o solicita una conexión.
 
 ## Variables de entorno
 

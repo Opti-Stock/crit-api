@@ -1,7 +1,7 @@
 import { app } from "./app.js";
+import { env } from "../../config/env.js";
 
-const DEFAULT_ADMIN_API_PORT = 3001;
-const port = Number(process.env.ADMIN_API_PORT ?? DEFAULT_ADMIN_API_PORT);
+const port = env.ADMIN_API_PORT;
 
 app.listen(port, () => {
   console.log(`admin-api listening on port ${port}`);
