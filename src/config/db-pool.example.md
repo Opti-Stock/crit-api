@@ -1,27 +1,9 @@
-# PostgreSQL Pool Example
+# PostgreSQL Pool
 
-Cuando se implemente la conexión real, se espera una configuración parecida a:
+La conexión reutilizable está implementada en:
 
-```ts
-import { Pool } from "pg";
-import { env } from "./env";
-
-const pool = new Pool({
-  connectionString: env.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000
-});
-
-pool.on("connect", () => {
-  console.log("Nueva conexión a PostgreSQL establecida");
-});
-
-pool.on("error", (error) => {
-  console.error("Error inesperado en PostgreSQL pool:", error);
-});
-
-export default pool;
+```txt
+src/config/db.ts
 ```
 
-Este archivo es solo documentación. No contiene código funcional activo.
+Usa `DATABASE_URL`, limita el número de conexiones y configura tiempos de espera de conexión e inactividad. La configuración de entorno se valida en `src/config/env.ts` y no imprime secretos.
