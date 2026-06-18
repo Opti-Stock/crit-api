@@ -4,7 +4,7 @@ Backend del sistema de optimización de asistencias para CRIT.
 
 ## Propósito
 
-Este repositorio contiene la API principal y la API administrativa del sistema.
+Este repositorio contiene la API principal, la API administrativa y la API de check-in del sistema.
 
 El backend será un monolito modular usando:
 
@@ -23,7 +23,8 @@ crit-front
   ↓
 crit-api
   ├── main-api
-  └── admin-api
+  ├── admin-api
+  └── checkin-api
   ↓
 PostgreSQL
   ↓
@@ -68,6 +69,16 @@ Responsable de administración:
 - Cuartos.
 - Catálogos administrativos.
 
+### Check-in API
+
+Ubicación:
+
+```txt
+src/apps/checkin-api/
+```
+
+Responsable del flujo de check-in. En esta etapa solo expone health check.
+
 ## Estructura
 
 ```txt
@@ -75,7 +86,8 @@ crit-api/
 ├── src/
 │   ├── apps/
 │   │   ├── main-api/
-│   │   └── admin-api/
+│   │   ├── admin-api/
+│   │   └── checkin-api/
 │   ├── config/
 │   ├── modules/
 │   ├── integrations/
@@ -152,6 +164,7 @@ NODE_ENV=development
 
 MAIN_API_PORT=3000
 ADMIN_API_PORT=3001
+CHECKIN_API_PORT=3002
 
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/crit_db
 
