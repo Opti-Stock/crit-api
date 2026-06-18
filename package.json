@@ -6,6 +6,7 @@
   "scripts": {
     "dev:main": "tsx watch src/apps/main-api/server.ts",
     "dev:admin": "tsx watch src/apps/admin-api/server.ts",
+    "dev:checkin": "tsx watch src/apps/checkin-api/server.ts",
     "build": "tsc --noEmit",
     "lint": "echo \"Lint not configured yet\"",
     "test": "echo \"Tests not configured yet\""
