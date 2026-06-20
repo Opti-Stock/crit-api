@@ -2,6 +2,9 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 
+import { errorMiddleware } from "../../middlewares/error.middleware.js";
+import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
+
 export const app = express();
 
 app.use(helmet());
@@ -14,3 +17,6 @@ app.get("/health", (_request, response) => {
     service: "checkin-api"
   });
 });
+
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
