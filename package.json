@@ -8,6 +8,7 @@
     "dev:admin": "tsx watch src/apps/admin-api/server.ts",
     "dev:checkin": "tsx watch src/apps/checkin-api/server.ts",
     "build": "tsc --noEmit",
+    "db:check": "tsx src/scripts/check-db.ts",
     "lint": "echo \"Lint not configured yet\"",
     "test": "echo \"Tests not configured yet\""
   },

@@ -1,9 +1,14 @@
 # PostgreSQL Pool
 
-La conexión reutilizable está implementada en:
+`src/config/db.ts` exporta un único `Pool` configurado por `DATABASE_URL`. La URL debe usar el rol `crit_app`, nunca el propietario de migraciones.
 
-```txt
-src/config/db.ts
+Importar el pool no abre una conexión. `npm run db:check` valida conectividad y que exista la baseline de `crit-db`.
+
+Los repositorios que consultan datos tenant-scoped deben adquirir un `PoolClient`, abrir una transacción, ejecutar:
+
+```sql
+SELECT set_config('app.current_tenant_id', $1, true);
+SELECT set_config('app.current_user_id', $1, true);
 ```
 
-Usa `DATABASE_URL`, limita el número de conexiones y configura tiempos de espera de conexión e inactividad. La configuración de entorno se valida en `src/config/env.ts` y no imprime secretos.
+y conservar el mismo cliente hasta `COMMIT`/`ROLLBACK`. El valor local a transacción evita filtrar identidad entre requests al reutilizar conexiones.

@@ -147,7 +147,7 @@ attendance/
 
 ## Conexión a PostgreSQL
 
-Se usa `pg` con un pool de conexiones reutilizable.
+Se usa `pg` con un pool de conexiones reutilizable y el rol PostgreSQL no propietario `crit_app`.
 
 Configuración:
 
@@ -156,6 +156,14 @@ src/config/db.ts
 ```
 
 Las variables de entorno se cargan y validan en `src/config/env.ts`. Importar el pool no abre una conexión; PostgreSQL se contacta cuando un repositorio ejecuta una consulta o solicita una conexión.
+
+Validar la conexión y la baseline:
+
+```bash
+npm run db:check
+```
+
+Cada operación tenant-scoped usa una transacción y establece `app.current_tenant_id` y `app.current_user_id` con `set_config(..., true)`. Las queries conservan además un filtro `tenant_id` explícito. Ver `docs/crit-api-integration.md`.
 
 ## Variables de entorno
 
@@ -168,7 +176,7 @@ MAIN_API_PORT=3000
 ADMIN_API_PORT=3001
 CHECKIN_API_PORT=3002
 
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/crit_db
+DATABASE_URL=postgresql://crit_app:crit_app@localhost:5432/crit_db
 
 JWT_SECRET=change_me
 JWT_EXPIRES_IN=8h
@@ -192,14 +200,14 @@ personal_acompanamiento
 paciente_familia
 ```
 
-Nota: `paciente_familia` debe evaluarse antes de activarse como login real. Para MVP puede bastar con recordatorios externos sin portal de paciente.
+Nota: `paciente_familia` está reservado y no se asigna durante el MVP. El login futuro recibe `{ tenantCode, email, password }` y el JWT conserva `userId`, `tenantId` y roles.
 
 ## Reglas de acceso iniciales
 
 - Médicos y terapeutas pueden registrar asistencia.
 - Médicos y terapeutas pueden escribir nota médica.
 - Recepción puede ver asistencia, pero no datos clínicos.
-- Dirección y admin pueden administrar usuarios y roles.
+- Dirección y admin pueden administrar usuarios y roles, pero no obtienen acceso clínico automático.
 - Coordinadores pueden gestionar citas y revisar operación de sus clínicas.
 - Pacientes/familias solo deberían ver su información si se decide activar portal propio.
 
@@ -213,7 +221,7 @@ La integración debe manejarse en:
 src/integrations/crit-post-api/
 ```
 
-Se recomienda usar patrón outbox desde base de datos para no perder información si la API externa falla.
+La mutación de negocio y `crit_api_outbox` se escriben en la misma transacción para no perder información si la API externa falla.
 
 ## Convención de ramas
 
