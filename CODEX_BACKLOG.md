@@ -74,9 +74,11 @@ src/config/db.ts
 Acceptance criteria:
 
 - Uses `DATABASE_URL`.
+- Connects with the non-owner `crit_app` role.
 - Pool settings include max connections, idle timeout, and connection timeout.
 - Does not log secrets.
 - Provides a reusable exported pool.
+- `npm run db:check` verifies connectivity and the `crit-db` baseline.
 
 ### OPT-API-03 — Add shared error/response/validation utilities
 
@@ -121,7 +123,8 @@ Acceptance criteria:
 - No hardcoded users.
 - JWT strategy is prepared.
 - Password hashing uses bcrypt.
-- Login contract is documented.
+- Login accepts `tenantCode`, `email`, and `password`.
+- JWT/user context includes `userId`, `tenantId`, and roles.
 - Does not expose password hashes.
 
 ### OPT-API-05 — Implement auth and role middlewares
@@ -142,7 +145,8 @@ Acceptance criteria:
 
 - Middleware can attach user context.
 - Middleware can enforce allowed roles.
-- Tenant/CRIT center context is prepared.
+- Tenant context is established per transaction through `app.current_tenant_id` and `app.current_user_id`.
+- Repository queries include explicit `tenant_id` filters in addition to RLS.
 - Reception role must not access medical-note content.
 
 ### OPT-API-06 — Implement users and roles admin modules
@@ -166,7 +170,7 @@ Goal:
 
 Acceptance criteria:
 
-- Queries are scoped by `crit_center_id`.
+- Queries are scoped by `tenant_id`.
 - Collaborators can belong to multiple clinics.
 - Clinics can have multiple rooms.
 - No clinical notes are leaked to reception.
