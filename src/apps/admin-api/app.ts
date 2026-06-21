@@ -4,6 +4,8 @@ import helmet from "helmet";
 
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
+import { rolesRouter } from "../../modules/roles/roles.routes.js";
+import { usersRouter } from "../../modules/users/users.routes.js";
 
 export const app = express();
 
@@ -17,6 +19,9 @@ app.get("/health", (_request, response) => {
     service: "admin-api"
   });
 });
+
+app.use("/admin/roles", rolesRouter);
+app.use("/admin/users", usersRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

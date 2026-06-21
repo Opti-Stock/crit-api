@@ -178,14 +178,32 @@ CHECKIN_API_PORT=3002
 
 DATABASE_URL=postgresql://crit_app:crit_app@localhost:5432/crit_db
 
-JWT_SECRET=change_me
+JWT_SECRET=replace_with_at_least_32_characters
 JWT_EXPIRES_IN=8h
+JWT_ISSUER=crit-api
+JWT_AUDIENCE=crit-assist
+BCRYPT_SALT_ROUNDS=12
+
+BOOTSTRAP_ADMIN_TENANT_CODE=CRIT-OCC-01
+BOOTSTRAP_ADMIN_FULL_NAME=Local Admin
+BOOTSTRAP_ADMIN_EMAIL=admin.local@crit.test
+BOOTSTRAP_ADMIN_PASSWORD=
 
 CORS_ORIGIN=http://localhost:5173
 
 CRIT_POST_API_URL=
 CRIT_POST_API_TOKEN=
 ```
+
+Create the first local administrator and validate M1 with:
+
+```bash
+npm run admin:bootstrap
+npm run test:integration
+```
+
+Bootstrap credentials are local-only and must never be committed. The command is
+idempotent for the configured administrator.
 
 ## Roles iniciales
 

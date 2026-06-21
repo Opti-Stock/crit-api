@@ -20,6 +20,7 @@ const envSchema = z
     JWT_EXPIRES_IN: z.string().min(1).default("8h"),
     JWT_ISSUER: z.string().min(1).default("crit-api"),
     JWT_AUDIENCE: z.string().min(1).default("crit-assist"),
+    BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
     CORS_ORIGIN: z.url(),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
     CRIT_POST_API_TOKEN: z.string().default("")

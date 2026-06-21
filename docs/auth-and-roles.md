@@ -68,3 +68,17 @@ Repositories must use this tenant context; protected endpoints reject `tenantId`
 Route authorization uses `requireRoles(...)` with OR semantics. Clinical routes
 that expose medical note content must require `medico` or `terapeuta`; reception
 must never pass that authorization.
+
+## Administrative API
+
+Only `admin` and `direccion` can access these routes in `admin-api`:
+
+- `GET /admin/roles`
+- `GET|POST /admin/users`
+- `GET|PATCH /admin/users/:userId`
+- `PUT /admin/users/:userId/roles`
+- `PUT /admin/users/:userId/clinic-access`
+- `PUT /admin/users/:userId/password`
+
+Role and clinic assignments are tenant-scoped and replaced transactionally. The
+last active administrator cannot be deactivated or lose the `admin` role.

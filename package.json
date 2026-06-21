@@ -9,6 +9,8 @@
     "dev:checkin": "tsx watch src/apps/checkin-api/server.ts",
     "build": "tsc --noEmit",
     "db:check": "tsx src/scripts/check-db.ts",
+    "admin:bootstrap": "tsx src/scripts/bootstrap-admin.ts",
+    "test:integration": "tsx src/scripts/test-m1-integration.ts",
     "lint": "echo \"Lint not configured yet\"",
     "test": "tsx --test --test-isolation=none src/**/*.test.ts"
   },
