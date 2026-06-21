@@ -16,14 +16,19 @@ const envSchema = z
         (value) => value.startsWith("postgres://") || value.startsWith("postgresql://"),
         "DATABASE_URL must be a PostgreSQL connection URL"
       ),
-    JWT_SECRET: z.string().min(1),
-    JWT_EXPIRES_IN: z.string().min(1),
+    JWT_SECRET: z.string().min(32),
+    JWT_EXPIRES_IN: z.string().min(1).default("8h"),
+    JWT_ISSUER: z.string().min(1).default("crit-api"),
+    JWT_AUDIENCE: z.string().min(1).default("crit-assist"),
     CORS_ORIGIN: z.url(),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
     CRIT_POST_API_TOKEN: z.string().default("")
   })
   .superRefine((values, context) => {
-    if (values.NODE_ENV === "production" && values.JWT_SECRET === "change_me") {
+    if (
+      values.NODE_ENV === "production" &&
+      values.JWT_SECRET === "replace_with_at_least_32_characters"
+    ) {
       context.addIssue({
         code: "custom",
         path: ["JWT_SECRET"],

@@ -1,18 +1,37 @@
-# Auth y roles
+# Authentication and roles
 
-## Login futuro
+## Login
+
+The main API exposes `POST /api/auth/login`:
 
 ```json
 {
   "tenantCode": "CRIT-OCC-01",
-  "email": "usuario@crit.org",
+  "email": "user@crit.org",
   "password": "..."
 }
 ```
 
-El email se normaliza a minúsculas. El tenant se resuelve antes de consultar `users`; el email solo es único dentro de cada tenant. El contexto autenticado/JWT contiene `userId`, `tenantId` y roles.
+The tenant code is trimmed and converted to uppercase. The email is trimmed and
+converted to lowercase. The active tenant is resolved before querying `users`,
+because email addresses are unique only within a tenant.
 
-## Roles iniciales
+Invalid tenant, user, status, and password combinations return the same
+`INVALID_CREDENTIALS` response. Password hashes are internal repository data and
+must never be returned or logged.
+
+Successful login returns an HS256 access token. Its subject is the user ID, and
+its private claims contain `tenantId` and the user's active role names. Tokens use
+the configured expiration, issuer, and audience:
+
+```dotenv
+JWT_SECRET=replace_with_at_least_32_characters
+JWT_EXPIRES_IN=8h
+JWT_ISSUER=crit-api
+JWT_AUDIENCE=crit-assist
+```
+
+## Initial roles
 
 - `admin`
 - `direccion`
@@ -21,13 +40,20 @@ El email se normaliza a minúsculas. El tenant se resuelve antes de consultar `u
 - `medico`
 - `terapeuta`
 - `personal_acompanamiento`
-- `paciente_familia` (reservado, no asignado en el MVP)
+- `paciente_familia` (reserved and not assigned in the MVP)
 
-## Reglas
+## Access rules
 
-- Dirección y admin gestionan usuarios, roles y configuración, pero no reciben acceso clínico automático.
-- Recepción registra y consulta asistencia operativa; nunca selecciona contenido de `medical_notes`.
-- Médicos y terapeutas registran asistencia y notas médicas bajo RLS clínico.
-- Coordinadores gestionan calendario y citas de sus clínicas.
-- Personal de acompañamiento crea notas de enlace cuando está autorizado.
-- Todas las decisiones combinan `tenantId`, rol, acceso a clínica y propiedad del recurso cuando corresponda.
+- `direccion` and `admin` manage users, roles, and configuration, but do not
+  receive clinical access automatically.
+- `recepcion` can register and read operational attendance information, but must
+  never receive medical note content.
+- `medico` and `terapeuta` register attendance and medical notes under clinical
+  RLS policies.
+- `coordinador` manages calendars and appointments for authorized clinics.
+- `personal_acompanamiento` creates handoff notes when authorized.
+- Authorization combines tenant, roles, clinic access, and resource ownership
+  where applicable.
+
+Bearer authentication, authorization middleware, and authenticated request
+context are introduced by OPT-27.
