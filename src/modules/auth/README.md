@@ -1,27 +1,15 @@
-# Módulo: auth
+# Auth module
 
-Este módulo pertenece a crit-api.
+Provides authentication for the main API through `POST /api/auth/login`.
 
-## Propósito
+The module follows `routes -> controller -> service -> repository -> PostgreSQL`.
+Tenant codes and email addresses are normalized before lookup. The tenant is resolved
+first, and every user query runs with PostgreSQL tenant context plus an explicit
+`tenant_id` filter.
 
-Pendiente de definir durante la implementación funcional.
+Successful authentication returns an HS256 access token containing the user ID,
+tenant ID, and role names. Invalid tenant, user, status, and password combinations
+all produce the same response so the endpoint does not reveal account existence.
 
-## Estructura esperada al implementar
-
-auth/
-├── auth.routes.ts
-├── auth.controller.ts
-├── auth.service.ts
-├── auth.repository.ts
-├── auth.validation.ts
-├── auth.constants.ts
-└── README.md
-
-## Responsabilidades por archivo
-
-- routes.ts: definición de endpoints.
-- controller.ts: entrada HTTP, request y response.
-- service.ts: reglas de negocio.
-- repository.ts: acceso a PostgreSQL usando pg.
-- validation.ts: validación de payloads.
-- constants.ts: estados, enums y constantes del módulo.
+Bearer authentication, authorization middleware, and `/api/auth/me` are implemented
+separately in OPT-27.

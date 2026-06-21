@@ -10,7 +10,7 @@
     "build": "tsc --noEmit",
     "db:check": "tsx src/scripts/check-db.ts",
     "lint": "echo \"Lint not configured yet\"",
-    "test": "echo \"Tests not configured yet\""
+    "test": "tsx --test --test-isolation=none src/**/*.test.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
