@@ -1,27 +1,8 @@
-# Módulo: users
+# Users module
 
-Este módulo pertenece a crit-api.
+Provides tenant-scoped user administration under `/admin/users` in `admin-api`.
+Only `admin` and `direccion` may use these endpoints. Password hashes never leave
+the repository boundary, and role/clinic assignments are replaced transactionally.
 
-## Propósito
-
-Pendiente de definir durante la implementación funcional.
-
-## Estructura esperada al implementar
-
-users/
-├── users.routes.ts
-├── users.controller.ts
-├── users.service.ts
-├── users.repository.ts
-├── users.validation.ts
-├── users.constants.ts
-└── README.md
-
-## Responsabilidades por archivo
-
-- routes.ts: definición de endpoints.
-- controller.ts: entrada HTTP, request y response.
-- service.ts: reglas de negocio.
-- repository.ts: acceso a PostgreSQL usando pg.
-- validation.ts: validación de payloads.
-- constants.ts: estados, enums y constantes del módulo.
+The module does not create collaborator or patient records. Those relationships
+remain owned by their corresponding modules.
