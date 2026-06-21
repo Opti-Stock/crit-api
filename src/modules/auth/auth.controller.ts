@@ -13,4 +13,8 @@ export class AuthController {
     const result = await this.service.login(input);
     sendSuccess(response, result);
   };
+
+  readonly me: RequestHandler = (request, response) => {
+    sendSuccess(response, request.auth);
+  };
 }

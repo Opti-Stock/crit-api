@@ -55,5 +55,16 @@ JWT_AUDIENCE=crit-assist
 - Authorization combines tenant, roles, clinic access, and resource ownership
   where applicable.
 
-Bearer authentication, authorization middleware, and authenticated request
-context are introduced by OPT-27.
+## Protected routes
+
+Protected routes require `Authorization: Bearer <token>`. Tokens are accepted only
+with HS256, the configured issuer and audience, a valid expiration, a UUID subject,
+a UUID `tenantId`, and a role-name array.
+
+`GET /api/auth/me` returns the authenticated `userId`, `tenantId`, and roles.
+Repositories must use this tenant context; protected endpoints reject `tenantId`,
+`tenant_id`, and `x-tenant-id` selectors supplied by clients.
+
+Route authorization uses `requireRoles(...)` with OR semantics. Clinical routes
+that expose medical note content must require `medico` or `terapeuta`; reception
+must never pass that authorization.
