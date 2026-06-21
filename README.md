@@ -205,6 +205,9 @@ npm run test:integration
 Bootstrap credentials are local-only and must never be committed. The command is
 idempotent for the configured administrator.
 
+Para preparar un centro adicional y crear su primer administrador, seguir
+[`docs/tenant-onboarding.md`](docs/tenant-onboarding.md).
+
 ## Roles iniciales
 
 ```txt
