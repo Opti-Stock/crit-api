@@ -43,10 +43,11 @@ src/apps/main-api/
 
 Responsable de la operación diaria:
 
-- Login / logout.
+- Login mediante access token.
 - Asistencias.
 - Pacientes.
 - Colaboradores.
+- Clínicas y cuartos para lecturas operativas.
 - Calendario.
 - Notas médicas.
 - Notas de enlace.
@@ -63,11 +64,8 @@ src/apps/admin-api/
 Responsable de administración:
 
 - Usuarios.
-- Roles.
-- Permisos.
-- Clínicas.
-- Cuartos.
-- Catálogos administrativos.
+- Asignación del catálogo fijo de roles.
+- Acceso de usuarios a clínicas.
 
 ### Check-in API
 
