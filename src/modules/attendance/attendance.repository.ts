@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { pool } from "../../config/db.js";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
+import { insertNotification } from "../notifications/notifications.repository.js";
 import type { CreateAttendanceInput, ListAttendanceInput } from "./attendance.validation.js";
 
 export type AttendanceAccessScope = { kind: "all" } | { kind: "clinics" } | { kind: "own-collaborator" };
@@ -168,6 +169,17 @@ export class AttendanceRepository {
             input.notesRequired
           ]
         );
+
+        if (input.notesRequired) {
+          await insertNotification(client, {
+            tenantId,
+            userId: actorId,
+            type: "pending_note",
+            title: "Nota médica pendiente",
+            message: "Esta asistencia quedó marcada como pendiente de nota médica."
+          });
+        }
+
         return (await this.findByIdWithClient(client, tenantId, inserted.rows[0]!.id))!;
       } catch (error) {
         throw mapDatabaseError(error);
