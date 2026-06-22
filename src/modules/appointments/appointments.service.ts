@@ -22,7 +22,7 @@ export class AppointmentsService {
   }
 }
 
-function resolveScope(roles: string[]): AppointmentAccessScope {
+export function resolveScope(roles: string[]): AppointmentAccessScope {
   if (roles.some((role) => TENANT_WIDE_ROLES.includes(role))) return { kind: "all" };
   if (roles.some((role) => CLINIC_SCOPED_ROLES.includes(role))) return { kind: "clinics" };
   if (roles.some((role) => OWN_COLLABORATOR_ROLES.includes(role))) return { kind: "own-collaborator" };
