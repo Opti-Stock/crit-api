@@ -11,8 +11,11 @@
     "db:check": "tsx src/scripts/check-db.ts",
     "admin:bootstrap": "tsx src/scripts/bootstrap-admin.ts",
     "test:integration": "tsx src/scripts/test-m1-integration.ts",
+    "test:outbox-integration": "tsx src/scripts/test-outbox-integration.ts",
+    "worker:crit-post-api": "tsx src/workers/crit-post-api.worker.ts",
+    "worker:crit-post-api:once": "tsx src/workers/crit-post-api.worker.ts --once",
     "lint": "echo \"Lint not configured yet\"",
-    "test": "tsx --test --test-isolation=none src/**/*.test.ts"
+    "test": "tsx --test --test-isolation=none --test-concurrency=1 src/**/*.test.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
