@@ -9,6 +9,7 @@ import { attendanceRouter } from "../../modules/attendance/attendance.routes.js"
 import { authRouter } from "../../modules/auth/auth.routes.js";
 import { calendarRouter } from "../../modules/calendar/calendar.routes.js";
 import { collaboratorsRouter } from "../../modules/collaborators/collaborators.routes.js";
+import { medicalNotesRouter } from "../../modules/medical-notes/medical-notes.routes.js";
 import { patientsRouter } from "../../modules/patients/patients.routes.js";
 
 export const app = express();
@@ -30,6 +31,7 @@ app.use("/api/collaborators", collaboratorsRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/appointments", appointmentsRouter);
 app.use("/api/attendance", attendanceRouter);
+app.use("/api/medical-notes", medicalNotesRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
