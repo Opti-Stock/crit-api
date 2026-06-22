@@ -46,8 +46,8 @@ JWT_AUDIENCE=crit-assist
 
 - `direccion` and `admin` manage users, roles, and configuration, but do not
   receive clinical access automatically.
-- `recepcion` can register and read operational attendance information, but must
-  never receive medical note content.
+- `recepcion` can read operational attendance information, but cannot register
+  attendance and must never receive medical note content.
 - `medico` and `terapeuta` register attendance and medical notes under clinical
   RLS policies.
 - `coordinador` manages calendars and appointments for authorized clinics.
@@ -94,3 +94,15 @@ read scopes.
 Roles are embedded in the access token at login. After an administrator changes
 role assignments, the affected user must log in again to receive an updated
 token. Removed roles can remain effective until the current token expires.
+
+Clinic access does not grant a role by itself. It only limits or expands the
+operational scope of roles such as `recepcion` and `coordinador`. A user with
+`medico` plus `coordinador` sees owned clinical appointments and attendance as
+well as operational records in assigned clinics, while medical-note content
+still requires the clinical role and clinical RLS context.
+
+The MVP does not persist sessions, refresh tokens, revocation lists, or logout
+state. Deactivating a user does not invalidate an already issued token. An
+emergency global revocation requires rotating `JWT_SECRET` and restarting both
+API processes; otherwise existing tokens remain valid until their original
+expiration.

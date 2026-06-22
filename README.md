@@ -1,262 +1,184 @@
 # crit-api
 
-Backend del sistema de optimización de asistencias para CRIT.
-
-## Propósito
-
-Este repositorio contiene la API principal, la API administrativa y la API de check-in del sistema.
-
-El backend será un monolito modular usando:
-
-- Node.js.
-- Express.
-- TypeScript.
-- PostgreSQL.
-- `pg` para conexión directa a base de datos.
-
-No se usará ORM en la primera versión.
+Backend de CRIT Assist para autenticacion, operacion diaria, administracion e
+integracion temporal con la API institucional del CRIT.
 
 ## Arquitectura
 
-```txt
-crit-front
-  ↓
-crit-api
-  ├── main-api
-  ├── admin-api
-  └── checkin-api
-  ↓
-PostgreSQL
-  ↓
-POST temporal hacia API CRIT
-```
+- Node.js, Express 5 y TypeScript.
+- PostgreSQL mediante `pg`, sin ORM.
+- Monolito modular con separacion `routes -> controller -> service -> repository`.
+- `main-api`: autenticacion y operacion diaria, puerto `3000`.
+- `admin-api`: usuarios, roles y accesos a clinicas, puerto `3001`.
+- `checkin-api`: reservado para check-in; actualmente solo health, puerto `3002`.
+- Worker independiente para el POST temporal hacia la API CRIT.
 
-## Apps internas
+`crit-db` es la unica fuente de verdad para esquema, migraciones y seeds. Esta
+API no crea tablas ni ejecuta DDL al iniciar.
 
-### Main API
+## Requisitos
 
-Ubicación:
+- Node.js 20 o posterior.
+- npm.
+- Docker Desktop para ejecutar `crit-db` localmente.
+- El repositorio hermano `crit-db` con su rama `dev` actualizada.
 
-```txt
-src/apps/main-api/
-```
+## Preparacion local
 
-Responsable de la operación diaria:
+1. Levantar PostgreSQL desde `crit-db`:
 
-- Login mediante access token.
-- Asistencias.
-- Pacientes.
-- Colaboradores.
-- Clínicas y cuartos para lecturas operativas.
-- Calendario.
-- Notas médicas.
-- Notas de enlace.
-- Notificaciones.
+   ```powershell
+   cd ..\crit-db
+   docker compose up -d
+   docker compose ps
+   cd ..\crit-api
+   ```
 
-### Admin API
+2. Instalar dependencias y crear la configuracion local:
 
-Ubicación:
+   ```powershell
+   npm install
+   Copy-Item .env.example .env
+   ```
 
-```txt
-src/apps/admin-api/
-```
+3. Sustituir en `.env` los placeholders de `JWT_SECRET` y
+   `BOOTSTRAP_ADMIN_PASSWORD`. Usar valores locales fuertes; `.env` esta
+   ignorado por Git y nunca debe agregarse al repositorio.
 
-Responsable de administración:
+4. Verificar la conexion y crear el primer administrador local:
 
-- Usuarios.
-- Asignación del catálogo fijo de roles.
-- Acceso de usuarios a clínicas.
+   ```powershell
+   npm run db:check
+   npm run admin:bootstrap
+   ```
 
-### Check-in API
-
-Ubicación:
-
-```txt
-src/apps/checkin-api/
-```
-
-Responsable del flujo de check-in. En esta etapa solo expone health check.
-
-## Estructura
-
-```txt
-crit-api/
-├── src/
-│   ├── apps/
-│   │   ├── main-api/
-│   │   ├── admin-api/
-│   │   └── checkin-api/
-│   ├── config/
-│   ├── modules/
-│   ├── integrations/
-│   ├── middlewares/
-│   ├── shared/
-│   ├── utils/
-│   └── types/
-├── docs/
-├── tests/
-├── .env.example
-├── Dockerfile
-├── docker-compose.yml
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Módulos iniciales
-
-```txt
-auth
-users
-roles
-patients
-collaborators
-clinics
-rooms
-appointments
-attendance
-medical-notes
-handoff-notes
-calendar
-notifications
-admin
-```
-
-## Patrón por módulo
-
-Cada módulo debe seguir esta separación:
-
-```txt
-routes -> controller -> service -> repository -> PostgreSQL
-```
-
-Ejemplo futuro:
-
-```txt
-attendance/
-├── attendance.routes.ts
-├── attendance.controller.ts
-├── attendance.service.ts
-├── attendance.repository.ts
-├── attendance.validation.ts
-├── attendance.constants.ts
-└── README.md
-```
-
-## Conexión a PostgreSQL
-
-Se usa `pg` con un pool de conexiones reutilizable y el rol PostgreSQL no propietario `crit_app`.
-
-Configuración:
-
-```txt
-src/config/db.ts
-```
-
-Las variables de entorno se cargan y validan en `src/config/env.ts`. Importar el pool no abre una conexión; PostgreSQL se contacta cuando un repositorio ejecuta una consulta o solicita una conexión.
-
-Validar la conexión y la baseline:
-
-```bash
-npm run db:check
-```
-
-Cada operación tenant-scoped usa una transacción y establece `app.current_tenant_id` y `app.current_user_id` con `set_config(..., true)`. Las queries conservan además un filtro `tenant_id` explícito. Ver `docs/crit-api-integration.md`.
+El bootstrap es idempotente para el correo configurado. Las instrucciones para
+crear otro centro y su primer administrador estan en
+[`docs/tenant-onboarding.md`](docs/tenant-onboarding.md).
 
 ## Variables de entorno
 
-Crear `.env` basado en `.env.example`.
+Las variables completas y sus defaults viven en `.env.example`.
 
-```env
-NODE_ENV=development
+| Grupo | Variables |
+| --- | --- |
+| Apps | `NODE_ENV`, `MAIN_API_PORT`, `ADMIN_API_PORT`, `CHECKIN_API_PORT`, `CORS_ORIGIN` |
+| PostgreSQL | `DATABASE_URL` con el rol no propietario `crit_app` |
+| JWT | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_ISSUER`, `JWT_AUDIENCE` |
+| Passwords | `BCRYPT_SALT_ROUNDS` |
+| Bootstrap | `BOOTSTRAP_ADMIN_TENANT_CODE`, `BOOTSTRAP_ADMIN_FULL_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` |
+| API CRIT | `CRIT_POST_API_URL`, `CRIT_POST_API_TOKEN` y opciones `CRIT_POST_API_*` del worker |
 
-MAIN_API_PORT=3000
-ADMIN_API_PORT=3001
-CHECKIN_API_PORT=3002
+La URL y el token de la API CRIT pueden quedar vacios para levantar las APIs.
+Son obligatorios solamente al iniciar el worker.
 
-DATABASE_URL=postgresql://crit_app:crit_app@localhost:5432/crit_db
+`CORS_ORIGIN` se valida como URL y queda preparado para una politica restrictiva;
+las tres apps usan actualmente la configuracion por defecto de `cors()`.
 
-JWT_SECRET=replace_with_at_least_32_characters
-JWT_EXPIRES_IN=8h
-JWT_ISSUER=crit-api
-JWT_AUDIENCE=crit-assist
-BCRYPT_SALT_ROUNDS=12
+## Ejecutar las aplicaciones
 
-BOOTSTRAP_ADMIN_TENANT_CODE=CRIT-OCC-01
-BOOTSTRAP_ADMIN_FULL_NAME=Local Admin
-BOOTSTRAP_ADMIN_EMAIL=admin.local@crit.test
-BOOTSTRAP_ADMIN_PASSWORD=
+Abrir una terminal por proceso:
 
-CORS_ORIGIN=http://localhost:5173
-
-CRIT_POST_API_URL=
-CRIT_POST_API_TOKEN=
+```powershell
+npm run dev:main
+npm run dev:admin
+npm run dev:checkin
 ```
 
-Create the first local administrator and validate M1 with:
+Health checks:
 
-```bash
-npm run admin:bootstrap
+```txt
+GET http://localhost:3000/health
+GET http://localhost:3001/health
+GET http://localhost:3002/health
+```
+
+Las rutas operativas estan bajo `http://localhost:3000/api`; las rutas
+administrativas, bajo `http://localhost:3001/admin`.
+
+## Autenticacion y tenant
+
+El login recibe tenant, email y password:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "tenantCode": "CRIT-OCC-01",
+  "email": "admin.local@crit.test",
+  "password": "local-password"
+}
+```
+
+El access token contiene `userId`, `tenantId` y todos los roles activos. Las
+rutas protegidas usan `Authorization: Bearer <token>`. Nunca se acepta un
+`tenantId` enviado por body, query o `x-tenant-id` como fuente de autorizacion.
+
+Un usuario puede tener varios roles. Los permisos de ruta usan semantica OR y
+los alcances operativos compatibles se combinan. Los cambios de roles requieren
+un nuevo login; el token anterior conserva sus claims hasta expirar.
+
+Consulta [`docs/auth-and-roles.md`](docs/auth-and-roles.md) para el contrato
+completo de RBAC.
+
+## Flujo operativo local
+
+1. Levantar `crit-db`, ejecutar bootstrap e iniciar `main-api` y `admin-api`.
+2. Obtener un token mediante `POST /api/auth/login`.
+3. Comprobarlo con `GET /api/auth/me`.
+4. Consultar pacientes, colaboradores, clinicas, cuartos y tipos de cita.
+5. Crear una cita con `POST /api/appointments` usando un usuario autorizado.
+6. Registrar asistencia con `POST /api/attendance` usando un usuario con rol
+   `medico` o `terapeuta` vinculado al colaborador de la cita.
+7. Ejecutar `npm run worker:crit-post-api:once` para procesar el outbox.
+
+Una base nueva incluye tenant y roles, pero no un catalogo operativo completo.
+Los pasos 4 a 6 requieren pacientes, clinicas, cuartos, tipos de cita y un
+colaborador clinico previamente aprovisionados. La validacion automatizada
+`npm run test:outbox-integration` crea y elimina sus filas operativas ficticias;
+los audit logs generados permanecen por diseno, sin valores clinicos.
+
+## Worker de integracion CRIT
+
+Registrar asistencia guarda el evento `attendance.registered` en
+`crit_api_outbox` dentro de la misma transaccion. El POST ocurre despues, por lo
+que una falla institucional no revierte la asistencia.
+
+```powershell
+# Proceso continuo
+npm run worker:crit-post-api
+
+# Un lote y salida
+npm run worker:crit-post-api:once
+```
+
+El payload es provisional y versionado. Solo contiene identificadores y estado
+operativo; no incluye nombres, contacto, notas medicas ni contenido clinico.
+Detalles en [`docs/crit-api-integration.md`](docs/crit-api-integration.md).
+
+## Validaciones
+
+```powershell
+npm run build
+npm test
+npm run db:check
 npm run test:integration
+npm run test:outbox-integration
 ```
 
-Bootstrap credentials are local-only and must never be committed. The command is
-idempotent for the configured administrator.
+- `build` valida TypeScript sin generar archivos.
+- `test` ejecuta las pruebas unitarias con `node:test` mediante `tsx`.
+- `db:check` verifica conexion y la baseline de `crit-db`.
+- `test:integration` valida login y administracion usando el admin previamente
+  creado; requiere las variables `BOOTSTRAP_ADMIN_*`.
+- `test:outbox-integration` valida atomicidad, envio, error, reintento,
+  recuperacion y concurrencia usando datos ficticios; requiere el tenant y el
+  admin configurados por `admin:bootstrap`.
+- `npm run lint` sigue siendo un placeholder y no valida codigo todavia.
 
-Para preparar un centro adicional y crear su primer administrador, seguir
-[`docs/tenant-onboarding.md`](docs/tenant-onboarding.md).
+## Convencion de ramas
 
-## Roles iniciales
-
-```txt
-admin
-direccion
-recepcion
-coordinador
-medico
-terapeuta
-personal_acompanamiento
-paciente_familia
-```
-
-Nota: `paciente_familia` está reservado y no se asigna durante el MVP. El login futuro recibe `{ tenantCode, email, password }` y el JWT conserva `userId`, `tenantId` y roles.
-
-## Reglas de acceso iniciales
-
-- Médicos y terapeutas pueden registrar asistencia.
-- Médicos y terapeutas pueden escribir nota médica.
-- Recepción puede ver asistencia, pero no datos clínicos.
-- Dirección y admin pueden administrar usuarios y roles, pero no obtienen acceso clínico automático.
-- Coordinadores pueden gestionar citas y revisar operación de sus clínicas.
-- Pacientes/familias solo deberían ver su información si se decide activar portal propio.
-
-## Integración temporal con API CRIT
-
-El sistema guardará datos propios en PostgreSQL y podrá mandar un POST temporal hacia la API del CRIT.
-
-La integración debe manejarse en:
-
-```txt
-src/integrations/crit-post-api/
-```
-
-La mutación de negocio y `crit_api_outbox` se escriben en la misma transacción para no perder información si la API externa falla.
-
-## Convención de ramas
-
-```txt
-main
-dev
-feat/OPT-00-descripcion
-fix/OPT-00-descripcion
-chore/OPT-00-descripcion
-docs/OPT-00-descripcion
-refactor/OPT-00-descripcion
-```
-
-## Responsables
-
-Backend:
-
-- Alan.
-- Esteban.
+Trabajar desde `dev` con ramas `feat/OPT-00-description`,
+`fix/OPT-00-description`, `docs/OPT-00-description` o equivalentes. No incluir
+secrets, `.env`, credenciales ni datos reales de pacientes en commits.

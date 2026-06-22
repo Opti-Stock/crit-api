@@ -1,37 +1,15 @@
-# API Conventions
+# API conventions
 
 ## Base URLs
 
-Main API:
+- Main API: `http://localhost:3000/api`
+- Admin API: `http://localhost:3001/admin`
+- Check-in API: `http://localhost:3002`; actualmente solo expone `/health`.
 
-```txt
-http://localhost:3000/api
-```
+## Respuestas
 
-Admin API:
-
-```txt
-http://localhost:3001/admin
-```
-
-Check-in API:
-
-```txt
-http://localhost:3002
-```
-
-## Convención de respuestas
-
-Los endpoints funcionales deben usar una respuesta consistente:
-
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
-
-Cuando sea necesario incluir paginación u otros metadatos:
+Los endpoints funcionales envuelven respuestas exitosas con `success` y
+`data`. `meta` se agrega cuando existe paginacion:
 
 ```json
 {
@@ -39,16 +17,21 @@ Cuando sea necesario incluir paginación u otros metadatos:
   "data": [],
   "meta": {
     "page": 1,
-    "pageSize": 20
+    "pageSize": 20,
+    "total": 0
   }
 }
 ```
 
-El health check conserva su contrato simple y no usa este wrapper.
+Una creacion responde `201`; una actualizacion normalmente responde `200`; el
+cambio de password administrativo responde `204`. Los health checks conservan
+su contrato simple y no usan el wrapper:
 
-## Convención de errores
+```json
+{ "status": "ok", "service": "main-api" }
+```
 
-Los errores usan el status HTTP correspondiente y el siguiente cuerpo:
+## Errores
 
 ```json
 {
@@ -60,20 +43,16 @@ Los errores usan el status HTTP correspondiente y el siguiente cuerpo:
 }
 ```
 
-Códigos HTTP iniciales:
+- `400`: solicitud o validacion invalida.
+- `401`: credenciales o access token invalidos.
+- `403`: rol, ownership o acceso a clinica insuficiente.
+- `404`: recurso no visible dentro del tenant o ruta inexistente.
+- `409`: conflicto de estado, unicidad o regla de negocio.
+- `500`: error inesperado con mensaje generico.
 
-- `400`: solicitud o validación inválida.
-- `401`: autenticación requerida o inválida.
-- `403`: permisos insuficientes.
-- `404`: recurso o ruta inexistente.
-- `409`: conflicto de estado o unicidad.
-- `500`: error interno inesperado.
-
-Los errores internos no exponen stack trace, payloads ni detalles sensibles.
-
-## Validación
-
-Los módulos definen sus schemas con Zod y usan el helper compartido para parsear datos. Un error de validación responde con `VALIDATION_ERROR` y solo incluye path y mensaje:
+El middleware global nunca devuelve stack traces, SQL, payloads internos ni
+contenido clinico. Los errores de validacion usan `VALIDATION_ERROR` y solo
+incluyen path y mensaje:
 
 ```json
 {
@@ -82,26 +61,34 @@ Los módulos definen sus schemas con Zod y usan el helper compartido para parsea
     "code": "VALIDATION_ERROR",
     "message": "Request validation failed",
     "details": [
-      {
-        "path": "email",
-        "message": "Invalid email address"
-      }
+      { "path": "email", "message": "Invalid email address" }
     ]
   }
 }
 ```
 
-Nunca se incluye el valor recibido en los detalles de validación.
+## Autenticacion
+
+`POST /api/auth/login` es publico. Las demas rutas funcionales usan el pipeline
+de autenticacion y tenant; `GET /api/auth/me` devuelve el contexto validado.
+
+Los access tokens se verifican con HS256, expiracion, issuer y audience. El
+tenant se deriva exclusivamente del claim `tenantId`. Los selectores
+`tenantId`, `tenant_id` y `x-tenant-id` enviados por clientes son rechazados en
+rutas protegidas.
+
+La autorizacion por rol usa semantica OR. El acceso final puede restringirse
+ademas por tenant, clinicas asignadas, colaborador vinculado y ownership.
+
+## Paginacion y fechas
+
+Los listados paginados usan `page` desde `1` y `pageSize` con maximo `100`. Las
+fechas y horas HTTP usan ISO 8601 con zona horaria. Los identificadores son UUID
+de PostgreSQL.
 
 ## Orden de middlewares
 
-Cada app registra, en este orden:
-
-1. Middlewares de seguridad y parsing.
-2. Rutas de la aplicación.
+1. `helmet`, CORS y parsing JSON.
+2. Rutas publicas o pipeline de autenticacion/autorizacion por router.
 3. Middleware de ruta no encontrada.
 4. Middleware global de errores.
-
-## Autenticación
-
-Pendiente de implementar con JWT.
