@@ -4,9 +4,25 @@
 
 ## Current state
 
-The repository has the initial folder structure, module placeholders, config files, Docker placeholders, README, and documentation skeleton.
+The repository contains functional main, admin, and check-in Express entrypoints,
+shared API/error utilities, validated environment and PostgreSQL pool config, and
+tenant-aware transactions using the non-owner `crit_app` role.
 
-It does not yet contain functional API code.
+Implemented through OPT-API-12 / Linear OPT-34:
+
+- Login, JWT authentication, multi-role authorization, and tenant context.
+- Admin users, fixed role assignment, and user-clinic access.
+- Read-only patients, collaborators, clinics, and rooms.
+- Appointments/calendar, attendance, and medical notes.
+- Handoff notes and internal notifications.
+
+Operational appointment and attendance reads combine all applicable role scopes.
+For example, a `medico` plus `coordinador` sees owned records and records from
+authorized clinics. Medical-note content remains restricted to clinical roles.
+
+The next listed backend capability is OPT-API-13: the CRIT API outbox integration
+skeleton. Check-in remains a separate app with health only; functional check-in
+work must be planned explicitly.
 
 ## Product scope for this repo
 
