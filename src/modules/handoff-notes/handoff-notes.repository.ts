@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { pool } from "../../config/db.js";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
+import { insertNotification } from "../notifications/notifications.repository.js";
 import type { CreateHandoffNoteInput, ListHandoffNotesInput } from "./handoff-notes.validation.js";
 
 const VALID_RECIPIENT_ROLES = ["admin", "medico", "terapeuta"];
@@ -139,6 +140,16 @@ export class HandoffNotesRepository {
            SELECT $1, $2, unnest($3::uuid[])`,
           [tenantId, handoffNoteId, recipientIds]
         );
+
+        for (const recipientId of recipientIds) {
+          await insertNotification(client, {
+            tenantId,
+            userId: recipientId,
+            type: "handoff_note_received",
+            title: "Nueva nota de enlace",
+            message: input.title
+          });
+        }
 
         return (await this.findByIdWithClient(client, tenantId, actorId, handoffNoteId))!;
       } catch (error) {
