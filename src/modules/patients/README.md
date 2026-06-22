@@ -4,7 +4,18 @@ Este módulo pertenece a crit-api.
 
 ## Propósito
 
-Pendiente de definir durante la implementación funcional.
+Endpoints de solo lectura para pacientes, montados en main-api (`/api/patients`).
+Las queries quedan scoped por `tenant_id` (vía `withTenantTransaction`). No expone
+contenido clínico: la tabla `patients` no almacena notas médicas (ver módulo
+`medical-notes`).
+
+## Endpoints
+
+- `GET /api/patients` — lista paginada (`page`, `pageSize`, `search`, `status`).
+- `GET /api/patients/:patientId` — detalle.
+
+Roles permitidos: admin, direccion, recepcion, coordinador, medico, terapeuta,
+personal_acompanamiento.
 
 ## Estructura esperada al implementar
 
