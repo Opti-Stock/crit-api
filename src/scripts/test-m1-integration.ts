@@ -54,6 +54,10 @@ async function run() {
 
     const me = await fetch(`${main.url}/api/auth/me`, { headers });
     assert.equal(me.status, 200);
+    assert.equal((await fetch(`${main.url}/api/clinics`, { headers })).status, 200);
+    assert.equal((await fetch(`${main.url}/api/rooms`, { headers })).status, 200);
+    assert.equal((await fetch(`${admin.url}/admin/clinics`, { headers })).status, 404);
+    assert.equal((await fetch(`${admin.url}/admin/rooms`, { headers })).status, 404);
     const rolesResponse = await fetch(`${admin.url}/admin/roles`, { headers });
     assert.equal(rolesResponse.status, 200);
     const roles = await rolesResponse.json() as Success<{ id: string; name: string }[]>;

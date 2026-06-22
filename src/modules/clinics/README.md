@@ -4,15 +4,15 @@ Este módulo pertenece a crit-api.
 
 ## Propósito
 
-Endpoints de solo lectura para clínicas, montados en admin-api
-(`/admin/clinics`). Una clínica puede tener varios cuartos (`rooms.clinic_id`)
+Endpoints operativos de solo lectura para clínicas, montados en main-api
+(`/api/clinics`). Una clínica puede tener varios cuartos (`rooms.clinic_id`)
 y un coordinador opcional (`clinics.coordinator_id` → `collaborators`).
 
 ## Endpoints
 
-- `GET /admin/clinics` — lista paginada (`page`, `pageSize`, `search`,
+- `GET /api/clinics` — lista paginada (`page`, `pageSize`, `search`,
   `status`), incluye `coordinator` y `roomCount`.
-- `GET /admin/clinics/:clinicId` — detalle, incluye `rooms`.
+- `GET /api/clinics/:clinicId` — detalle, incluye `rooms`.
 
 Roles permitidos: admin, direccion, recepcion, coordinador, medico, terapeuta,
 personal_acompanamiento.

@@ -4,9 +4,7 @@ import helmet from "helmet";
 
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
-import { clinicsRouter } from "../../modules/clinics/clinics.routes.js";
 import { rolesRouter } from "../../modules/roles/roles.routes.js";
-import { roomsRouter } from "../../modules/rooms/rooms.routes.js";
 import { usersRouter } from "../../modules/users/users.routes.js";
 
 export const app = express();
@@ -24,8 +22,6 @@ app.get("/health", (_request, response) => {
 
 app.use("/admin/roles", rolesRouter);
 app.use("/admin/users", usersRouter);
-app.use("/admin/clinics", clinicsRouter);
-app.use("/admin/rooms", roomsRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
