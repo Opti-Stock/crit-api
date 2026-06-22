@@ -1,5 +1,10 @@
-# CRIT POST API Integration
+# CRIT POST API integration
 
-Integración temporal para enviar datos capturados por el sistema hacia la API del CRIT.
+Worker temporal que envia eventos `attendance.registered` almacenados en
+`crit_api_outbox`. La asistencia y el evento se confirman atomicamente antes de
+cualquier solicitud HTTP, por lo que una falla externa no bloquea ni revierte el
+flujo operativo.
 
-No debe bloquear el flujo operativo si la API externa falla.
+El payload es provisional, versionado y no contiene notas medicas ni datos de
+contacto. El contrato, configuracion, reintentos y comandos de validacion se
+documentan en [`docs/crit-api-integration.md`](../../../docs/crit-api-integration.md).

@@ -8,21 +8,22 @@ The repository contains functional main, admin, and check-in Express entrypoints
 shared API/error utilities, validated environment and PostgreSQL pool config, and
 tenant-aware transactions using the non-owner `crit_app` role.
 
-Implemented through OPT-API-12 / Linear OPT-34:
+Implemented through OPT-API-14 / Linear OPT-36:
 
 - Login, JWT authentication, multi-role authorization, and tenant context.
 - Admin users, fixed role assignment, and user-clinic access.
 - Read-only patients, collaborators, clinics, and rooms.
 - Appointments/calendar, attendance, and medical notes.
 - Handoff notes and internal notifications.
+- Transactional attendance outbox and the standalone CRIT POST API worker.
+- Local setup, RBAC, API conventions, and integration documentation.
 
 Operational appointment and attendance reads combine all applicable role scopes.
 For example, a `medico` plus `coordinador` sees owned records and records from
 authorized clinics. Medical-note content remains restricted to clinical roles.
 
-The next listed backend capability is OPT-API-13: the CRIT API outbox integration
-skeleton. Check-in remains a separate app with health only; functional check-in
-work must be planned explicitly.
+M0 through M3 are implemented. Check-in remains a separate app with health only;
+functional check-in work must be planned explicitly before extending the MVP.
 
 ## Product scope for this repo
 
