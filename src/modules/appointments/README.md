@@ -16,6 +16,11 @@ autosugerido de horarios (`collaborator_availability`) no se implementa aquí.
 - `recepcion`, `coordinador`: citas de las clínicas en `user_clinic_access`.
 - `medico`, `terapeuta`: solo citas donde son el colaborador asignado.
 
+Los alcances de varios roles se combinan. Por ejemplo, un usuario `medico` y
+`coordinador` ve sus citas propias más las citas de sus clínicas autorizadas.
+El detalle aplica el mismo alcance que el listado. Recepción y coordinación solo
+pueden crear citas dentro de `user_clinic_access`.
+
 ## Endpoints
 
 - `GET /api/appointments` — lista paginada (`page`, `pageSize`, `from`, `to`,

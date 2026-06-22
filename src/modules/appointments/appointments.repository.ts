@@ -1,11 +1,10 @@
 import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
-import { BadRequestError, ConflictError } from "../../shared/errors/app-error.js";
+import type { OperationalAccessScope } from "../../shared/access/operational-access-scope.js";
+import { BadRequestError, ConflictError, ForbiddenError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import type { CreateAppointmentInput, ListAppointmentsInput } from "./appointments.validation.js";
-
-export type AppointmentAccessScope = { kind: "all" } | { kind: "clinics" } | { kind: "own-collaborator" };
 
 export interface AppointmentSummary {
   id: string;
@@ -63,23 +62,21 @@ export class AppointmentsRepository {
     tenantId: string,
     actorId: string,
     input: ListAppointmentsInput,
-    scope: AppointmentAccessScope
+    scope: OperationalAccessScope
   ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const filters = ["a.tenant_id = $1", "a.deleted_at IS NULL"];
       const values: unknown[] = [tenantId];
 
-      if (scope.kind === "own-collaborator") {
-        const collaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
-        if (!collaboratorId) return { appointments: [], total: 0 };
-        values.push(collaboratorId);
-        filters.push(`a.collaborator_id = $${values.length}`);
-      } else if (scope.kind === "clinics") {
-        const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
-        if (clinicIds.length === 0) return { appointments: [], total: 0 };
-        values.push(clinicIds);
-        filters.push(`a.clinic_id = ANY($${values.length}::uuid[])`);
-      }
+      const hasAccess = await this.appendAccessFilter(
+        client,
+        tenantId,
+        actorId,
+        scope,
+        values,
+        filters
+      );
+      if (!hasAccess) return { appointments: [], total: 0 };
 
       if (input.clinicId) {
         values.push(input.clinicId);
@@ -128,14 +125,44 @@ export class AppointmentsRepository {
   async findById(
     tenantId: string,
     actorId: string,
-    appointmentId: string
+    appointmentId: string,
+    scope: OperationalAccessScope
   ): Promise<AppointmentSummary | null> {
-    return withTenantTransaction({ tenantId, userId: actorId }, (client) =>
-      this.findByIdWithClient(client, tenantId, appointmentId), this.databasePool);
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const filters = ["a.tenant_id = $1", "a.id = $2", "a.deleted_at IS NULL"];
+      const values: unknown[] = [tenantId, appointmentId];
+      const hasAccess = await this.appendAccessFilter(
+        client,
+        tenantId,
+        actorId,
+        scope,
+        values,
+        filters
+      );
+      if (!hasAccess) return null;
+      return this.findByFilters(client, filters, values);
+    }, this.databasePool);
   }
 
-  async create(tenantId: string, actorId: string, input: CreateAppointmentInput) {
+  async create(
+    tenantId: string,
+    actorId: string,
+    input: CreateAppointmentInput,
+    scope: OperationalAccessScope
+  ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      if (!scope.tenantWide) {
+        const clinicIds = scope.clinics
+          ? await this.resolveAccessibleClinicIds(client, tenantId, actorId)
+          : [];
+        if (!clinicIds.includes(input.clinicId)) {
+          throw new ForbiddenError(
+            "You cannot create appointments for this clinic",
+            "APPOINTMENT_CLINIC_FORBIDDEN"
+          );
+        }
+      }
+
       try {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO appointments (
@@ -165,11 +192,49 @@ export class AppointmentsRepository {
   }
 
   private async findByIdWithClient(client: PoolClient, tenantId: string, appointmentId: string) {
-    const result = await client.query<AppointmentRow>(
-      `${SELECT_APPOINTMENT} WHERE a.tenant_id = $1 AND a.id = $2 AND a.deleted_at IS NULL`,
+    return this.findByFilters(
+      client,
+      ["a.tenant_id = $1", "a.id = $2", "a.deleted_at IS NULL"],
       [tenantId, appointmentId]
     );
+  }
+
+  private async findByFilters(client: PoolClient, filters: string[], values: unknown[]) {
+    const result = await client.query<AppointmentRow>(
+      `${SELECT_APPOINTMENT} WHERE ${filters.join(" AND ")}`,
+      values
+    );
     return result.rows[0] ? mapSummary(result.rows[0]) : null;
+  }
+
+  private async appendAccessFilter(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    scope: OperationalAccessScope,
+    values: unknown[],
+    filters: string[]
+  ): Promise<boolean> {
+    if (scope.tenantWide) return true;
+
+    const accessClauses: string[] = [];
+    if (scope.clinics) {
+      const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
+      if (clinicIds.length > 0) {
+        values.push(clinicIds);
+        accessClauses.push(`a.clinic_id = ANY($${values.length}::uuid[])`);
+      }
+    }
+    if (scope.ownCollaborator) {
+      const collaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      if (collaboratorId) {
+        values.push(collaboratorId);
+        accessClauses.push(`a.collaborator_id = $${values.length}`);
+      }
+    }
+    if (accessClauses.length === 0) return false;
+    filters.push(`(${accessClauses.join(" OR ")})`);
+    return true;
   }
 
   private async resolveOwnCollaboratorId(client: PoolClient, tenantId: string, userId: string) {

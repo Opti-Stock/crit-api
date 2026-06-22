@@ -82,3 +82,15 @@ Only `admin` and `direccion` can access these routes in `admin-api`:
 
 Role and clinic assignments are tenant-scoped and replaced transactionally. The
 last active administrator cannot be deactivated or lose the `admin` role.
+
+## Multiple roles
+
+A user may hold several roles at the same time. Route authorization uses OR
+semantics, so `medico` plus `coordinador` can use either role's endpoints.
+Operational read scopes are combined: own clinical records plus records from
+authorized clinics. Tenant-wide roles (`admin`, `direccion`) supersede narrower
+read scopes.
+
+Roles are embedded in the access token at login. After an administrator changes
+role assignments, the affected user must log in again to receive an updated
+token. Removed roles can remain effective until the current token expires.
