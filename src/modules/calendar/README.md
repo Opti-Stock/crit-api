@@ -4,7 +4,17 @@ Este módulo pertenece a crit-api.
 
 ## Propósito
 
-Pendiente de definir durante la implementación funcional.
+Catálogo de solo lectura que da soporte a la creación de citas (`appointments`):
+tipos de cita disponibles (`appointment_types`), montado en main-api
+(`/api/calendar`). El autosugerido de horarios usando
+`collaborator_availability` queda preparado en `crit-db` pero no se
+implementa en este módulo.
+
+## Endpoints
+
+- `GET /api/calendar/appointment-types` — catálogo del tenant.
+
+Roles permitidos: admin, direccion, recepcion, coordinador, medico, terapeuta.
 
 ## Estructura esperada al implementar
 

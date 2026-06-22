@@ -1,0 +1,41 @@
+import { z } from "zod";
+
+const postgresUuid = z.string().regex(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  "Invalid UUID"
+);
+
+const APPOINTMENT_STATUSES = ["scheduled", "confirmed", "completed", "cancelled", "rescheduled"] as const;
+
+export const appointmentIdParamsSchema = z.object({ appointmentId: postgresUuid });
+
+export const listAppointmentsSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
+  status: z.enum(APPOINTMENT_STATUSES).optional(),
+  clinicId: postgresUuid.optional(),
+  patientId: postgresUuid.optional(),
+  collaboratorId: postgresUuid.optional()
+});
+
+export const createAppointmentSchema = z
+  .object({
+    patientId: postgresUuid,
+    collaboratorId: postgresUuid,
+    clinicId: postgresUuid,
+    roomId: postgresUuid,
+    appointmentTypeId: postgresUuid,
+    startsAt: z.iso.datetime(),
+    endsAt: z.iso.datetime(),
+    preSessionMinutes: z.coerce.number().int().min(0).default(0),
+    postSessionMinutes: z.coerce.number().int().min(0).default(0)
+  })
+  .refine((value) => new Date(value.startsAt).getTime() < new Date(value.endsAt).getTime(), {
+    message: "startsAt must be before endsAt",
+    path: ["endsAt"]
+  });
+
+export type ListAppointmentsInput = z.output<typeof listAppointmentsSchema>;
+export type CreateAppointmentInput = z.output<typeof createAppointmentSchema>;

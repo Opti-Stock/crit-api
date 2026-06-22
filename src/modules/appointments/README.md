@@ -4,7 +4,25 @@ Este módulo pertenece a crit-api.
 
 ## Propósito
 
-Pendiente de definir durante la implementación funcional.
+Creación manual y listado de citas, montado en main-api (`/api/appointments`).
+La FK compuesta `(tenant_id, collaborator_id, clinic_id)` en `crit-db` exige
+que el colaborador ya tenga membresía en esa clínica (`collaborator_clinics`);
+la FK de `room_id` exige que el cuarto pertenezca a esa misma clínica. El
+autosugerido de horarios (`collaborator_availability`) no se implementa aquí.
+
+## Visibilidad por rol
+
+- `admin`, `direccion`: todas las citas del tenant.
+- `recepcion`, `coordinador`: citas de las clínicas en `user_clinic_access`.
+- `medico`, `terapeuta`: solo citas donde son el colaborador asignado.
+
+## Endpoints
+
+- `GET /api/appointments` — lista paginada (`page`, `pageSize`, `from`, `to`,
+  `status`, `clinicId`, `patientId`, `collaboratorId`), filtrada según el rol.
+- `GET /api/appointments/:appointmentId` — detalle.
+- `POST /api/appointments` — crea una cita. Roles: admin, direccion,
+  recepcion, coordinador.
 
 ## Estructura esperada al implementar
 
