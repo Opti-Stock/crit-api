@@ -4,7 +4,18 @@ Este módulo pertenece a crit-api.
 
 ## Propósito
 
-Pendiente de definir durante la implementación funcional.
+Endpoints de solo lectura para colaboradores, montados en main-api
+(`/api/collaborators`). Un colaborador puede pertenecer a varias clínicas a
+través de `collaborator_clinics`; el detalle expone esa membresía.
+
+## Endpoints
+
+- `GET /api/collaborators` — lista paginada (`page`, `pageSize`, `search`,
+  `status`, `clinicId`).
+- `GET /api/collaborators/:collaboratorId` — detalle, incluye `clinics`.
+
+Roles permitidos: admin, direccion, recepcion, coordinador, medico, terapeuta,
+personal_acompanamiento.
 
 ## Estructura esperada al implementar
 
