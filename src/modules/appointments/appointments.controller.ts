@@ -11,7 +11,7 @@ import {
 } from "./appointments.validation.js";
 
 export class AppointmentsController {
-  constructor(private readonly service = new AppointmentsService()) {}
+  constructor(private readonly service: AppointmentsService) {}
 
   readonly list: RequestHandler = async (request, response) => {
     const input = parseWithSchema(listAppointmentsSchema, request.query);

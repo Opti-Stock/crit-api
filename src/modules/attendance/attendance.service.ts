@@ -1,10 +1,10 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { resolveOperationalAccessScope } from "../../shared/access/operational-access-scope.js";
-import { AttendanceRepository } from "./attendance.repository.js";
+import type { AttendanceRepository } from "./attendance.repository.js";
 import type { CreateAttendanceInput, ListAttendanceInput } from "./attendance.validation.js";
 
 export class AttendanceService {
-  constructor(private readonly repository = new AttendanceRepository()) {}
+  constructor(private readonly repository: AttendanceRepository) {}
 
   list(context: AuthenticatedRequestContext, input: ListAttendanceInput) {
     return this.repository.list(

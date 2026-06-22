@@ -11,7 +11,7 @@ import {
 } from "./attendance.validation.js";
 
 export class AttendanceController {
-  constructor(private readonly service = new AttendanceService()) {}
+  constructor(private readonly service: AttendanceService) {}
 
   readonly list: RequestHandler = async (request, response) => {
     const input = parseWithSchema(listAttendanceSchema, request.query);
