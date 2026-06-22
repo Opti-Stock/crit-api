@@ -4,6 +4,7 @@ import { pool } from "../../config/db.js";
 import type { OperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
+import { insertAttendanceRegisteredEvent } from "../../integrations/crit-post-api/crit-post-api.payload.js";
 import { insertNotification } from "../notifications/notifications.repository.js";
 import type { CreateAttendanceInput, ListAttendanceInput } from "./attendance.validation.js";
 
@@ -163,12 +164,12 @@ export class AttendanceRepository {
       }
 
       try {
-        const inserted = await client.query<{ id: string }>(
+        const inserted = await client.query<{ id: string; checked_at: Date | string }>(
           `INSERT INTO attendance_records (
              tenant_id, appointment_id, patient_id, collaborator_id,
              checked_by_user_id, status, checked_at, notes_required
            ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7)
-           RETURNING id`,
+           RETURNING id, checked_at`,
           [
             tenantId,
             input.appointmentId,
@@ -179,6 +180,17 @@ export class AttendanceRepository {
             input.notesRequired
           ]
         );
+        const attendance = inserted.rows[0]!;
+
+        await insertAttendanceRegisteredEvent(client, {
+          tenantId,
+          attendanceId: attendance.id,
+          appointmentId: input.appointmentId,
+          patientId: appointmentRow.patient_id,
+          collaboratorId: appointmentRow.collaborator_id,
+          status: input.status,
+          checkedAt: toIsoString(attendance.checked_at)
+        });
 
         if (input.notesRequired) {
           await insertNotification(client, {
@@ -190,7 +202,7 @@ export class AttendanceRepository {
           });
         }
 
-        return (await this.findByIdWithClient(client, tenantId, inserted.rows[0]!.id))!;
+        return (await this.findByIdWithClient(client, tenantId, attendance.id))!;
       } catch (error) {
         throw mapDatabaseError(error);
       }
@@ -267,6 +279,10 @@ export class AttendanceRepository {
     );
     return result.rows.map((row) => row.clinic_id);
   }
+}
+
+function toIsoString(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
 function mapSummary(row: AttendanceRow): AttendanceSummary {

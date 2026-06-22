@@ -2,6 +2,7 @@ import "dotenv/config";
 import { z } from "zod";
 
 const portSchema = z.coerce.number().int().min(1).max(65_535);
+const positiveIntegerSchema = z.coerce.number().int().positive();
 
 const envSchema = z
   .object({
@@ -23,7 +24,12 @@ const envSchema = z
     BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
     CORS_ORIGIN: z.url(),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
-    CRIT_POST_API_TOKEN: z.string().default("")
+    CRIT_POST_API_TOKEN: z.string().default(""),
+    CRIT_POST_API_POLL_INTERVAL_MS: positiveIntegerSchema.default(5_000),
+    CRIT_POST_API_BATCH_SIZE: positiveIntegerSchema.max(100).default(10),
+    CRIT_POST_API_MAX_RETRIES: positiveIntegerSchema.default(5),
+    CRIT_POST_API_REQUEST_TIMEOUT_MS: positiveIntegerSchema.default(10_000),
+    CRIT_POST_API_PROCESSING_TIMEOUT_MS: positiveIntegerSchema.default(60_000)
   })
   .superRefine((values, context) => {
     if (
