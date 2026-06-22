@@ -8,11 +8,13 @@ import { appointmentsRouter } from "../../modules/appointments/appointments.rout
 import { attendanceRouter } from "../../modules/attendance/attendance.routes.js";
 import { authRouter } from "../../modules/auth/auth.routes.js";
 import { calendarRouter } from "../../modules/calendar/calendar.routes.js";
+import { clinicsRouter } from "../../modules/clinics/clinics.routes.js";
 import { collaboratorsRouter } from "../../modules/collaborators/collaborators.routes.js";
 import { handoffNotesRouter } from "../../modules/handoff-notes/handoff-notes.routes.js";
 import { medicalNotesRouter } from "../../modules/medical-notes/medical-notes.routes.js";
 import { notificationsRouter } from "../../modules/notifications/notifications.routes.js";
 import { patientsRouter } from "../../modules/patients/patients.routes.js";
+import { roomsRouter } from "../../modules/rooms/rooms.routes.js";
 
 export const app = express();
 
@@ -30,6 +32,8 @@ app.get("/health", (_request, response) => {
 app.use("/api/auth", authRouter);
 app.use("/api/patients", patientsRouter);
 app.use("/api/collaborators", collaboratorsRouter);
+app.use("/api/clinics", clinicsRouter);
+app.use("/api/rooms", roomsRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/appointments", appointmentsRouter);
 app.use("/api/attendance", attendanceRouter);
