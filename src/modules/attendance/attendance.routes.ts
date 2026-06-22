@@ -4,8 +4,12 @@ import { authenticateRequest } from "../../middlewares/auth.pipeline.js";
 import { requireRoles } from "../../middlewares/role.middleware.js";
 import { requireTenantContext } from "../../middlewares/tenant.middleware.js";
 import { AttendanceController } from "./attendance.controller.js";
+import { AttendanceRepository } from "./attendance.repository.js";
+import { AttendanceService } from "./attendance.service.js";
 
-const controller = new AttendanceController();
+const repository = new AttendanceRepository();
+const service = new AttendanceService(repository);
+const controller = new AttendanceController(service);
 export const attendanceRouter = Router();
 
 attendanceRouter.use(
