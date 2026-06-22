@@ -4,6 +4,7 @@ import helmet from "helmet";
 
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
+import { appointmentsRouter } from "../../modules/appointments/appointments.routes.js";
 import { authRouter } from "../../modules/auth/auth.routes.js";
 import { calendarRouter } from "../../modules/calendar/calendar.routes.js";
 import { collaboratorsRouter } from "../../modules/collaborators/collaborators.routes.js";
@@ -26,6 +27,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/patients", patientsRouter);
 app.use("/api/collaborators", collaboratorsRouter);
 app.use("/api/calendar", calendarRouter);
+app.use("/api/appointments", appointmentsRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
