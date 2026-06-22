@@ -19,6 +19,10 @@ trigger `audit_attendance_records` en `crit-db`.
 - Registro (`POST`): solo medico, terapeuta, y únicamente para citas donde
   son el colaborador asignado.
 
+Cuando un usuario tiene varios roles, la lectura combina sus alcances. Un
+`medico` y `coordinador` ve sus asistencias propias y las de sus clínicas
+autorizadas. El detalle aplica las mismas restricciones que el listado.
+
 ## Endpoints
 
 - `GET /api/attendance` — lista paginada (`page`, `pageSize`, `from`, `to`,

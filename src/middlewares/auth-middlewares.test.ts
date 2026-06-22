@@ -135,3 +135,11 @@ test("role middleware allows configured roles and denies reception clinical acce
   assert.ok(error instanceof AppError);
   assert.equal(error.code, "INSUFFICIENT_ROLE");
 });
+
+test("a medico and coordinador can use either role capability", async () => {
+  const request = createRequest();
+  request.auth = { userId, tenantId, roles: ["medico", "coordinador"] };
+
+  assert.equal(await runMiddleware(requireRoles("medico"), request), undefined);
+  assert.equal(await runMiddleware(requireRoles("coordinador"), request), undefined);
+});

@@ -1,12 +1,11 @@
 import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
+import type { OperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import { insertNotification } from "../notifications/notifications.repository.js";
 import type { CreateAttendanceInput, ListAttendanceInput } from "./attendance.validation.js";
-
-export type AttendanceAccessScope = { kind: "all" } | { kind: "clinics" } | { kind: "own-collaborator" };
 
 export interface AttendanceSummary {
   id: string;
@@ -52,24 +51,22 @@ export class AttendanceRepository {
     tenantId: string,
     actorId: string,
     input: ListAttendanceInput,
-    scope: AttendanceAccessScope
+    scope: OperationalAccessScope
   ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const joins = ["JOIN appointments a ON a.tenant_id = ar.tenant_id AND a.id = ar.appointment_id"];
       const filters = ["ar.tenant_id = $1", "ar.deleted_at IS NULL"];
       const values: unknown[] = [tenantId];
 
-      if (scope.kind === "own-collaborator") {
-        const collaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
-        if (!collaboratorId) return { records: [], total: 0 };
-        values.push(collaboratorId);
-        filters.push(`ar.collaborator_id = $${values.length}`);
-      } else if (scope.kind === "clinics") {
-        const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
-        if (clinicIds.length === 0) return { records: [], total: 0 };
-        values.push(clinicIds);
-        filters.push(`a.clinic_id = ANY($${values.length}::uuid[])`);
-      }
+      const hasAccess = await this.appendAccessFilter(
+        client,
+        tenantId,
+        actorId,
+        scope,
+        values,
+        filters
+      );
+      if (!hasAccess) return { records: [], total: 0 };
 
       if (input.clinicId) {
         values.push(input.clinicId);
@@ -120,10 +117,23 @@ export class AttendanceRepository {
   async findById(
     tenantId: string,
     actorId: string,
-    attendanceId: string
+    attendanceId: string,
+    scope: OperationalAccessScope
   ): Promise<AttendanceSummary | null> {
-    return withTenantTransaction({ tenantId, userId: actorId }, (client) =>
-      this.findByIdWithClient(client, tenantId, attendanceId), this.databasePool);
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const filters = ["ar.tenant_id = $1", "ar.id = $2", "ar.deleted_at IS NULL"];
+      const values: unknown[] = [tenantId, attendanceId];
+      const hasAccess = await this.appendAccessFilter(
+        client,
+        tenantId,
+        actorId,
+        scope,
+        values,
+        filters
+      );
+      if (!hasAccess) return null;
+      return this.findByFilters(client, filters, values, true);
+    }, this.databasePool);
   }
 
   async create(
@@ -188,11 +198,58 @@ export class AttendanceRepository {
   }
 
   private async findByIdWithClient(client: PoolClient, tenantId: string, attendanceId: string) {
+    return this.findByFilters(
+      client,
+      ["ar.tenant_id = $1", "ar.id = $2", "ar.deleted_at IS NULL"],
+      [tenantId, attendanceId],
+      false
+    );
+  }
+
+  private async findByFilters(
+    client: PoolClient,
+    filters: string[],
+    values: unknown[],
+    joinAppointments: boolean
+  ) {
+    const appointmentJoin = joinAppointments
+      ? "JOIN appointments a ON a.tenant_id = ar.tenant_id AND a.id = ar.appointment_id"
+      : "";
     const result = await client.query<AttendanceRow>(
-      `${SELECT_ATTENDANCE} WHERE ar.tenant_id = $1 AND ar.id = $2 AND ar.deleted_at IS NULL`,
-      [tenantId, attendanceId]
+      `${SELECT_ATTENDANCE} ${appointmentJoin} WHERE ${filters.join(" AND ")}`,
+      values
     );
     return result.rows[0] ? mapSummary(result.rows[0]) : null;
+  }
+
+  private async appendAccessFilter(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    scope: OperationalAccessScope,
+    values: unknown[],
+    filters: string[]
+  ): Promise<boolean> {
+    if (scope.tenantWide) return true;
+
+    const accessClauses: string[] = [];
+    if (scope.clinics) {
+      const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
+      if (clinicIds.length > 0) {
+        values.push(clinicIds);
+        accessClauses.push(`a.clinic_id = ANY($${values.length}::uuid[])`);
+      }
+    }
+    if (scope.ownCollaborator) {
+      const collaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      if (collaboratorId) {
+        values.push(collaboratorId);
+        accessClauses.push(`ar.collaborator_id = $${values.length}`);
+      }
+    }
+    if (accessClauses.length === 0) return false;
+    filters.push(`(${accessClauses.join(" OR ")})`);
+    return true;
   }
 
   private async resolveOwnCollaboratorId(client: PoolClient, tenantId: string, userId: string) {
