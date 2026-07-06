@@ -40,7 +40,7 @@ const envSchema = z
       z.string().transform((value) => value.trim().toLowerCase()).pipe(z.email())
     ]).default(""),
     PLATFORM_BOOTSTRAP_PASSWORD: z.union([z.literal(""), z.string().min(12).max(72)]).default(""),
-    CORS_ORIGIN: z.url(),
+    CORS_ORIGIN: z.url().default("http://localhost:5173"),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
     CRIT_POST_API_TOKEN: z.string().default(""),
     CRIT_POST_API_POLL_INTERVAL_MS: positiveIntegerSchema.default(5_000),
