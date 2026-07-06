@@ -16,3 +16,4 @@ medicalNotesRouter.use(
 medicalNotesRouter.get("/", controller.list);
 medicalNotesRouter.get("/:medicalNoteId", controller.get);
 medicalNotesRouter.post("/", controller.create);
+medicalNotesRouter.patch("/:medicalNoteId", controller.update);

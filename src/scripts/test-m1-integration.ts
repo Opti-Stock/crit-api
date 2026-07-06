@@ -25,10 +25,9 @@ async function close(server: Server) {
 }
 
 async function run() {
-  const tenantCode = process.env.BOOTSTRAP_ADMIN_TENANT_CODE;
   const email = process.env.BOOTSTRAP_ADMIN_EMAIL;
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-  if (!tenantCode || !email || !password) throw new Error("Bootstrap environment variables are required");
+  if (!email || !password) throw new Error("Bootstrap admin email and password are required");
 
   const main = await listen(mainApp);
   const admin = await listen(adminApp);
@@ -40,7 +39,7 @@ async function run() {
     const loginResponse = await fetch(`${main.url}/api/auth/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tenantCode, email, password })
+      body: JSON.stringify({ email, password })
     });
     assert.equal(loginResponse.status, 200);
     const login = await loginResponse.json() as Success<{
@@ -56,8 +55,8 @@ async function run() {
     assert.equal(me.status, 200);
     assert.equal((await fetch(`${main.url}/api/clinics`, { headers })).status, 200);
     assert.equal((await fetch(`${main.url}/api/rooms`, { headers })).status, 200);
-    assert.equal((await fetch(`${admin.url}/admin/clinics`, { headers })).status, 404);
-    assert.equal((await fetch(`${admin.url}/admin/rooms`, { headers })).status, 404);
+    assert.equal((await fetch(`${admin.url}/admin/clinics`, { headers })).status, 200);
+    assert.equal((await fetch(`${admin.url}/admin/rooms`, { headers })).status, 200);
     const rolesResponse = await fetch(`${admin.url}/admin/roles`, { headers });
     assert.equal(rolesResponse.status, 200);
     const roles = await rolesResponse.json() as Success<{ id: string; name: string }[]>;

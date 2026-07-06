@@ -1,5 +1,5 @@
 export const AUTH_ERROR = {
-  invalidCredentials: "Invalid tenant, email, or password"
+  invalidCredentials: "Invalid email or password"
 } as const;
 
 export const AUTH_ERROR_CODE = {

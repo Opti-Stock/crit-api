@@ -6,19 +6,17 @@ The main API exposes `POST /api/auth/login`:
 
 ```json
 {
-  "tenantCode": "CRIT-OCC-01",
   "email": "user@crit.org",
   "password": "..."
 }
 ```
 
-The tenant code is trimmed and converted to uppercase. The email is trimmed and
-converted to lowercase. The active tenant is resolved before querying `users`,
-because email addresses are unique only within a tenant.
+The email is trimmed and converted to lowercase. The tenant is resolved
+internally from a single active user email in an active tenant.
 
-Invalid tenant, user, status, and password combinations return the same
-`INVALID_CREDENTIALS` response. Password hashes are internal repository data and
-must never be returned or logged.
+Invalid user, inactive user, inactive tenant, ambiguous email, and password
+combinations return the same `INVALID_CREDENTIALS` response. Password hashes are
+internal repository data and must never be returned or logged.
 
 Successful login returns an HS256 access token. Its subject is the user ID, and
 its private claims contain `tenantId` and the user's active role names. Tokens use
@@ -82,6 +80,17 @@ Only `admin` and `direccion` can access these routes in `admin-api`:
 
 Role and clinic assignments are tenant-scoped and replaced transactionally. The
 last active administrator cannot be deactivated or lose the `admin` role.
+
+## Platform super admin
+
+The platform super admin is not a tenant user and does not use tenant roles.
+It authenticates through `POST /super-admin/auth/login` with email and password,
+receives a platform-scoped JWT, and can create CRIT tenants plus the first
+tenant admin through `super-admin-api`.
+
+The platform database role is intentionally separate from `crit_app`. It can
+provision tenants, roles, users and assignments, and can read non-clinical
+operational counts. It must not receive access to medical-note content.
 
 ## Multiple roles
 

@@ -10,7 +10,8 @@ integracion temporal con la API institucional del CRIT.
 - Monolito modular con separacion `routes -> controller -> service -> repository`.
 - `main-api`: autenticacion y operacion diaria, puerto `3000`.
 - `admin-api`: usuarios, roles y accesos a clinicas, puerto `3001`.
-- `checkin-api`: reservado para check-in; actualmente solo health, puerto `3002`.
+- `checkin-api`: check-in autenticado de recepcion, puerto `3002`.
+- `super-admin-api`: administracion global multi-CRIT, puerto `3003`.
 - Worker independiente para el POST temporal hacia la API CRIT.
 
 `crit-db` es la unica fuente de verdad para esquema, migraciones y seeds. Esta
@@ -41,7 +42,8 @@ API no crea tablas ni ejecuta DDL al iniciar.
    Copy-Item .env.example .env
    ```
 
-3. Sustituir en `.env` los placeholders de `JWT_SECRET` y
+3. Sustituir en `.env` los placeholders de `JWT_SECRET`,
+   `PLATFORM_JWT_SECRET`, `PLATFORM_BOOTSTRAP_PASSWORD` y
    `BOOTSTRAP_ADMIN_PASSWORD`. Usar valores locales fuertes; `.env` esta
    ignorado por Git y nunca debe agregarse al repositorio.
 
@@ -49,6 +51,7 @@ API no crea tablas ni ejecuta DDL al iniciar.
 
    ```powershell
    npm run db:check
+   npm run platform:bootstrap-super-admin
    npm run admin:bootstrap
    ```
 
@@ -62,11 +65,11 @@ Las variables completas y sus defaults viven en `.env.example`.
 
 | Grupo | Variables |
 | --- | --- |
-| Apps | `NODE_ENV`, `MAIN_API_PORT`, `ADMIN_API_PORT`, `CHECKIN_API_PORT`, `CORS_ORIGIN` |
-| PostgreSQL | `DATABASE_URL` con el rol no propietario `crit_app` |
-| JWT | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_ISSUER`, `JWT_AUDIENCE` |
+| Apps | `NODE_ENV`, `MAIN_API_PORT`, `ADMIN_API_PORT`, `CHECKIN_API_PORT`, `SUPER_ADMIN_API_PORT`, `CORS_ORIGIN` |
+| PostgreSQL | `DATABASE_URL` con `crit_app`, `PLATFORM_DATABASE_URL` con `crit_platform_app` |
+| JWT | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_ISSUER`, `JWT_AUDIENCE`, `PLATFORM_JWT_*` |
 | Passwords | `BCRYPT_SALT_ROUNDS` |
-| Bootstrap | `BOOTSTRAP_ADMIN_TENANT_CODE`, `BOOTSTRAP_ADMIN_FULL_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` |
+| Bootstrap | `PLATFORM_BOOTSTRAP_*`, `BOOTSTRAP_ADMIN_TENANT_CODE`, `BOOTSTRAP_ADMIN_FULL_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` |
 | API CRIT | `CRIT_POST_API_URL`, `CRIT_POST_API_TOKEN` y opciones `CRIT_POST_API_*` del worker |
 
 La URL y el token de la API CRIT pueden quedar vacios para levantar las APIs.
@@ -83,6 +86,7 @@ Abrir una terminal por proceso:
 npm run dev:main
 npm run dev:admin
 npm run dev:checkin
+npm run dev:super-admin
 ```
 
 Health checks:
@@ -91,29 +95,34 @@ Health checks:
 GET http://localhost:3000/health
 GET http://localhost:3001/health
 GET http://localhost:3002/health
+GET http://localhost:3003/health
 ```
 
 Las rutas operativas estan bajo `http://localhost:3000/api`; las rutas
-administrativas, bajo `http://localhost:3001/admin`.
+administrativas, bajo `http://localhost:3001/admin`; check-in, bajo
+`http://localhost:3002/checkin`; y super admin, bajo
+`http://localhost:3003/super-admin`.
 
 ## Autenticacion y tenant
 
-El login recibe tenant, email y password:
+El login recibe email y password:
 
 ```http
 POST /api/auth/login
 Content-Type: application/json
 
 {
-  "tenantCode": "CRIT-OCC-01",
   "email": "admin.local@crit.test",
   "password": "local-password"
 }
 ```
 
-El access token contiene `userId`, `tenantId` y todos los roles activos. Las
-rutas protegidas usan `Authorization: Bearer <token>`. Nunca se acepta un
-`tenantId` enviado por body, query o `x-tenant-id` como fuente de autorizacion.
+La API resuelve internamente el tenant a partir de un email activo y unico en un
+tenant activo. Si el email es ambiguo entre tenants, el login responde el mismo
+`401` generico que una contrasena incorrecta. El access token contiene `userId`,
+`tenantId` y todos los roles activos. Las rutas protegidas usan
+`Authorization: Bearer <token>`. Nunca se acepta un `tenantId` enviado por body,
+query o `x-tenant-id` como fuente de autorizacion.
 
 Un usuario puede tener varios roles. Los permisos de ruta usan semantica OR y
 los alcances operativos compatibles se combinan. Los cambios de roles requieren
@@ -121,6 +130,42 @@ un nuevo login; el token anterior conserva sus claims hasta expirar.
 
 Consulta [`docs/auth-and-roles.md`](docs/auth-and-roles.md) para el contrato
 completo de RBAC.
+
+## Super admin global
+
+El super admin usa una API y un token separados del tenant:
+
+```http
+POST /super-admin/auth/login
+Content-Type: application/json
+
+{
+  "email": "platform.admin@crit.test",
+  "password": "local-platform-password"
+}
+```
+
+Endpoints principales:
+
+- `GET /super-admin/tenants`
+- `POST /super-admin/tenants`
+- `GET|PATCH /super-admin/tenants/:tenantId`
+- `POST /super-admin/tenants/:tenantId/admin-users`
+
+El super admin puede crear CRITs y el primer admin de cada CRIT. No tiene
+endpoints ni permisos de base de datos para leer contenido de notas medicas.
+
+## Check-in API
+
+`checkin-api` usa el mismo JWT de usuarios tenant-scoped y acepta roles
+`recepcion`, `admin` y `direccion`.
+
+- `GET /checkin/appointments?date=YYYY-MM-DD&clinicId=<uuid>&search=<text>`
+- `GET /checkin/appointments/:appointmentId`
+- `POST /checkin/appointments/:appointmentId/check-in`
+
+El check-in registra asistencia `present` o `late`, no expone contenido clinico
+y respeta el acceso por clinica de recepcion.
 
 ## Flujo operativo local
 

@@ -1,6 +1,6 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { MedicalNotesRepository } from "./medical-notes.repository.js";
-import type { CreateMedicalNoteInput, ListMedicalNotesInput } from "./medical-notes.validation.js";
+import type { CreateMedicalNoteInput, ListMedicalNotesInput, UpdateMedicalNoteInput } from "./medical-notes.validation.js";
 
 export class MedicalNotesService {
   constructor(private readonly repository = new MedicalNotesRepository()) {}
@@ -15,5 +15,9 @@ export class MedicalNotesService {
 
   create(context: AuthenticatedRequestContext, input: CreateMedicalNoteInput) {
     return this.repository.create(context.tenantId, context.userId, input);
+  }
+
+  update(context: AuthenticatedRequestContext, medicalNoteId: string, input: UpdateMedicalNoteInput) {
+    return this.repository.update(context.tenantId, context.userId, medicalNoteId, input);
   }
 }

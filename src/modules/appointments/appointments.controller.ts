@@ -7,7 +7,8 @@ import { AppointmentsService } from "./appointments.service.js";
 import {
   appointmentIdParamsSchema,
   createAppointmentSchema,
-  listAppointmentsSchema
+  listAppointmentsSchema,
+  updateAppointmentSchema
 } from "./appointments.validation.js";
 
 export class AppointmentsController {
@@ -34,5 +35,11 @@ export class AppointmentsController {
   readonly create: RequestHandler = async (request, response) => {
     const input = parseWithSchema(createAppointmentSchema, request.body);
     sendSuccess(response, await this.service.create(request.auth!, input), 201);
+  };
+
+  readonly update: RequestHandler = async (request, response) => {
+    const { appointmentId } = parseWithSchema(appointmentIdParamsSchema, request.params);
+    const input = parseWithSchema(updateAppointmentSchema, request.body);
+    sendSuccess(response, await this.service.update(request.auth!, appointmentId, input));
   };
 }

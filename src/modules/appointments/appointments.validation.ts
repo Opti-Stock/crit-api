@@ -37,5 +37,32 @@ export const createAppointmentSchema = z
     path: ["endsAt"]
   });
 
+export const updateAppointmentSchema = z
+  .object({
+    patientId: postgresUuid.optional(),
+    collaboratorId: postgresUuid.optional(),
+    clinicId: postgresUuid.optional(),
+    roomId: postgresUuid.optional(),
+    appointmentTypeId: postgresUuid.optional(),
+    startsAt: z.iso.datetime().optional(),
+    endsAt: z.iso.datetime().optional(),
+    preSessionMinutes: z.coerce.number().int().min(0).optional(),
+    postSessionMinutes: z.coerce.number().int().min(0).optional(),
+    status: z.enum(APPOINTMENT_STATUSES).optional()
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required")
+  .refine(
+    (value) =>
+      !value.startsAt ||
+      !value.endsAt ||
+      new Date(value.startsAt).getTime() < new Date(value.endsAt).getTime(),
+    {
+      message: "startsAt must be before endsAt",
+      path: ["endsAt"]
+    }
+  );
+
 export type ListAppointmentsInput = z.output<typeof listAppointmentsSchema>;
 export type CreateAppointmentInput = z.output<typeof createAppointmentSchema>;
+export type UpdateAppointmentInput = z.output<typeof updateAppointmentSchema>;

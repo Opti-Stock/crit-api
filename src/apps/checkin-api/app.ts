@@ -4,6 +4,7 @@ import helmet from "helmet";
 
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
+import { checkinRouter } from "../../modules/checkin/checkin.routes.js";
 
 export const app = express();
 
@@ -17,6 +18,8 @@ app.get("/health", (_request, response) => {
     service: "checkin-api"
   });
 });
+
+app.use("/checkin", checkinRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

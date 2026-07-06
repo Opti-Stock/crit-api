@@ -24,3 +24,8 @@ appointmentsRouter.post(
   requireRoles("admin", "direccion", "recepcion", "coordinador"),
   controller.create
 );
+appointmentsRouter.patch(
+  "/:appointmentId",
+  requireRoles("admin", "direccion", "recepcion", "coordinador"),
+  controller.update
+);

@@ -27,5 +27,11 @@ export const createAttendanceSchema = z.object({
   notesRequired: z.boolean().default(false)
 });
 
+export const updateAttendanceSchema = z.object({
+  status: z.enum(ATTENDANCE_STATUSES).optional(),
+  notesRequired: z.boolean().optional()
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+
 export type ListAttendanceInput = z.output<typeof listAttendanceSchema>;
 export type CreateAttendanceInput = z.output<typeof createAttendanceSchema>;
+export type UpdateAttendanceInput = z.output<typeof updateAttendanceSchema>;

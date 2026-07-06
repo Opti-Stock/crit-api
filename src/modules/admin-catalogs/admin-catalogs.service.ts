@@ -1,0 +1,68 @@
+import type { AuthenticatedRequestContext } from "../../types/global.js";
+import { AdminCatalogsRepository } from "./admin-catalogs.repository.js";
+import type {
+  CreateAppointmentTypeInput,
+  CreateClinicInput,
+  CreateCollaboratorInput,
+  CreatePatientInput,
+  CreateRoomInput,
+  UpdateAppointmentTypeInput,
+  UpdateClinicInput,
+  UpdateCollaboratorInput,
+  UpdatePatientInput,
+  UpdateRoomInput
+} from "./admin-catalogs.validation.js";
+
+export class AdminCatalogsService {
+  constructor(private readonly repository = new AdminCatalogsRepository()) {}
+
+  listClinics(context: AuthenticatedRequestContext) {
+    return this.repository.listClinics(context.tenantId, context.userId);
+  }
+  createClinic(context: AuthenticatedRequestContext, input: CreateClinicInput) {
+    return this.repository.createClinic(context.tenantId, context.userId, input);
+  }
+  updateClinic(context: AuthenticatedRequestContext, id: string, input: UpdateClinicInput) {
+    return this.repository.updateClinic(context.tenantId, context.userId, id, input);
+  }
+
+  listPatients(context: AuthenticatedRequestContext) {
+    return this.repository.listPatients(context.tenantId, context.userId);
+  }
+  createPatient(context: AuthenticatedRequestContext, input: CreatePatientInput) {
+    return this.repository.createPatient(context.tenantId, context.userId, input);
+  }
+  updatePatient(context: AuthenticatedRequestContext, id: string, input: UpdatePatientInput) {
+    return this.repository.updatePatient(context.tenantId, context.userId, id, input);
+  }
+
+  listRooms(context: AuthenticatedRequestContext) {
+    return this.repository.listRooms(context.tenantId, context.userId);
+  }
+  createRoom(context: AuthenticatedRequestContext, input: CreateRoomInput) {
+    return this.repository.createRoom(context.tenantId, context.userId, input);
+  }
+  updateRoom(context: AuthenticatedRequestContext, id: string, input: UpdateRoomInput) {
+    return this.repository.updateRoom(context.tenantId, context.userId, id, input);
+  }
+
+  listAppointmentTypes(context: AuthenticatedRequestContext) {
+    return this.repository.listAppointmentTypes(context.tenantId, context.userId);
+  }
+  createAppointmentType(context: AuthenticatedRequestContext, input: CreateAppointmentTypeInput) {
+    return this.repository.createAppointmentType(context.tenantId, context.userId, input);
+  }
+  updateAppointmentType(context: AuthenticatedRequestContext, id: string, input: UpdateAppointmentTypeInput) {
+    return this.repository.updateAppointmentType(context.tenantId, context.userId, id, input);
+  }
+
+  listCollaborators(context: AuthenticatedRequestContext) {
+    return this.repository.listCollaborators(context.tenantId, context.userId);
+  }
+  createCollaborator(context: AuthenticatedRequestContext, input: CreateCollaboratorInput) {
+    return this.repository.createCollaborator(context.tenantId, context.userId, input);
+  }
+  updateCollaborator(context: AuthenticatedRequestContext, id: string, input: UpdateCollaboratorInput) {
+    return this.repository.updateCollaborator(context.tenantId, context.userId, id, input);
+  }
+}

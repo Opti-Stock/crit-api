@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { pool } from "../../config/db.js";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
-import type { CreateMedicalNoteInput, ListMedicalNotesInput } from "./medical-notes.validation.js";
+import type { CreateMedicalNoteInput, ListMedicalNotesInput, UpdateMedicalNoteInput } from "./medical-notes.validation.js";
 
 export interface MedicalNoteSummary {
   id: string;
@@ -141,6 +141,41 @@ export class MedicalNotesRepository {
           ]
         );
         return (await this.findByIdWithClient(client, tenantId, inserted.rows[0]!.id))!;
+      } catch (error) {
+        throw mapDatabaseError(error);
+      }
+    }, this.databasePool);
+  }
+
+  async update(tenantId: string, actorId: string, medicalNoteId: string, input: UpdateMedicalNoteInput) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const current = await client.query<{ collaborator_id: string }>(
+        `SELECT collaborator_id
+         FROM medical_notes
+         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+        [tenantId, medicalNoteId]
+      );
+      const currentRow = current.rows[0];
+      if (!currentRow) throw new NotFoundError("Medical note not found", "MEDICAL_NOTE_NOT_FOUND");
+
+      const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      if (ownCollaboratorId !== currentRow.collaborator_id) {
+        throw new ForbiddenError(
+          "You can only update a medical note for your own appointments",
+          "MEDICAL_NOTE_NOT_OWNED"
+        );
+      }
+
+      try {
+        await client.query(
+          `UPDATE medical_notes
+           SET content = COALESCE($3::jsonb, content),
+               format_version = COALESCE($4, format_version),
+               updated_by_user_id = $5
+           WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [tenantId, medicalNoteId, input.content ?? null, input.formatVersion ?? null, actorId]
+        );
+        return (await this.findByIdWithClient(client, tenantId, medicalNoteId))!;
       } catch (error) {
         throw mapDatabaseError(error);
       }

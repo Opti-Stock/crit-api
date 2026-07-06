@@ -7,7 +7,8 @@ import { MedicalNotesService } from "./medical-notes.service.js";
 import {
   createMedicalNoteSchema,
   listMedicalNotesSchema,
-  medicalNoteIdParamsSchema
+  medicalNoteIdParamsSchema,
+  updateMedicalNoteSchema
 } from "./medical-notes.validation.js";
 
 export class MedicalNotesController {
@@ -34,5 +35,11 @@ export class MedicalNotesController {
   readonly create: RequestHandler = async (request, response) => {
     const input = parseWithSchema(createMedicalNoteSchema, request.body);
     sendSuccess(response, await this.service.create(request.auth!, input), 201);
+  };
+
+  readonly update: RequestHandler = async (request, response) => {
+    const { medicalNoteId } = parseWithSchema(medicalNoteIdParamsSchema, request.params);
+    const input = parseWithSchema(updateMedicalNoteSchema, request.body);
+    sendSuccess(response, await this.service.update(request.auth!, medicalNoteId, input));
   };
 }

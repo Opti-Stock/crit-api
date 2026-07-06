@@ -41,15 +41,11 @@ export class AuthService {
   ) {}
 
   async login(input: LoginInput): Promise<LoginResult> {
-    const tenantId = await this.repository.findTenantIdByCode(input.tenantCode);
-    if (!tenantId) {
+    const matches = await this.repository.findActiveCredentialsByEmail(input.email);
+    if (matches.length !== 1) {
       throw this.invalidCredentials();
     }
-
-    const credentials = await this.repository.findActiveCredentials(tenantId, input.email);
-    if (!credentials) {
-      throw this.invalidCredentials();
-    }
+    const credentials = matches[0];
 
     const passwordMatches = await this.comparePassword(input.password, credentials.passwordHash);
     if (!passwordMatches) {
@@ -57,7 +53,7 @@ export class AuthService {
     }
 
     const accessToken = this.signAccessToken(credentials);
-    await this.repository.recordSuccessfulLogin(tenantId, credentials.id);
+    await this.repository.recordSuccessfulLogin(credentials.tenantId, credentials.id);
 
     return {
       accessToken,

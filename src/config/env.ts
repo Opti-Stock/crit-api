@@ -10,6 +10,7 @@ const envSchema = z
     MAIN_API_PORT: portSchema.default(3000),
     ADMIN_API_PORT: portSchema.default(3001),
     CHECKIN_API_PORT: portSchema.default(3002),
+    SUPER_ADMIN_API_PORT: portSchema.default(3003),
     DATABASE_URL: z
       .string()
       .min(1)
@@ -17,11 +18,28 @@ const envSchema = z
         (value) => value.startsWith("postgres://") || value.startsWith("postgresql://"),
         "DATABASE_URL must be a PostgreSQL connection URL"
       ),
+    PLATFORM_DATABASE_URL: z
+      .string()
+      .min(1)
+      .refine(
+        (value) => value.startsWith("postgres://") || value.startsWith("postgresql://"),
+        "PLATFORM_DATABASE_URL must be a PostgreSQL connection URL"
+      ),
     JWT_SECRET: z.string().min(32),
     JWT_EXPIRES_IN: z.string().min(1).default("8h"),
     JWT_ISSUER: z.string().min(1).default("crit-api"),
     JWT_AUDIENCE: z.string().min(1).default("crit-assist"),
+    PLATFORM_JWT_SECRET: z.string().min(32),
+    PLATFORM_JWT_EXPIRES_IN: z.string().min(1).default("4h"),
+    PLATFORM_JWT_ISSUER: z.string().min(1).default("crit-api-platform"),
+    PLATFORM_JWT_AUDIENCE: z.string().min(1).default("crit-assist-platform"),
     BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+    PLATFORM_BOOTSTRAP_FULL_NAME: z.string().min(1).default("Platform Super Admin"),
+    PLATFORM_BOOTSTRAP_EMAIL: z.union([
+      z.literal(""),
+      z.string().transform((value) => value.trim().toLowerCase()).pipe(z.email())
+    ]).default(""),
+    PLATFORM_BOOTSTRAP_PASSWORD: z.union([z.literal(""), z.string().min(12).max(72)]).default(""),
     CORS_ORIGIN: z.url(),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
     CRIT_POST_API_TOKEN: z.string().default(""),

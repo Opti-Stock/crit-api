@@ -1,7 +1,7 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { resolveOperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import type { AppointmentsRepository } from "./appointments.repository.js";
-import type { CreateAppointmentInput, ListAppointmentsInput } from "./appointments.validation.js";
+import type { CreateAppointmentInput, ListAppointmentsInput, UpdateAppointmentInput } from "./appointments.validation.js";
 
 export class AppointmentsService {
   constructor(private readonly repository: AppointmentsRepository) {}
@@ -28,6 +28,16 @@ export class AppointmentsService {
     return this.repository.create(
       context.tenantId,
       context.userId,
+      input,
+      resolveOperationalAccessScope(context.roles)
+    );
+  }
+
+  update(context: AuthenticatedRequestContext, appointmentId: string, input: UpdateAppointmentInput) {
+    return this.repository.update(
+      context.tenantId,
+      context.userId,
+      appointmentId,
       input,
       resolveOperationalAccessScope(context.roles)
     );
