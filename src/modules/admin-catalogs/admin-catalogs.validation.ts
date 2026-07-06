@@ -1,0 +1,80 @@
+import { z } from "zod";
+
+const postgresUuid = z.string().regex(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  "Invalid UUID"
+);
+
+const optionalEmail = z
+  .string()
+  .transform((value) => value.trim().toLowerCase())
+  .pipe(z.email().max(255))
+  .optional();
+
+const status = z.enum(["active", "inactive"]).optional();
+const positiveInt = z.coerce.number().int().positive();
+const nonNegativeInt = z.coerce.number().int().min(0);
+
+export const idParamsSchema = z.object({ id: postgresUuid });
+
+export const createClinicSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  specialization: z.string().trim().max(150).optional(),
+  capacity: positiveInt.optional(),
+  coordinatorId: postgresUuid.optional()
+}).strict();
+export const updateClinicSchema = createClinicSchema.partial().extend({ status }).strict();
+
+export const createPatientSchema = z.object({
+  fullName: z.string().trim().min(1).max(255),
+  birthDate: z.iso.date(),
+  externalId: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(50).optional(),
+  email: optionalEmail,
+  disability: z.string().trim().max(100).optional(),
+  gender: z.string().trim().max(50).optional()
+}).strict();
+export const updatePatientSchema = createPatientSchema.partial().extend({ status }).strict();
+
+export const createRoomSchema = z.object({
+  clinicId: postgresUuid,
+  name: z.string().trim().min(1).max(100),
+  capacity: positiveInt.optional()
+}).strict();
+export const updateRoomSchema = createRoomSchema.partial().extend({ status }).strict();
+
+export const createAppointmentTypeSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  defaultDurationMinutes: positiveInt,
+  defaultPreSessionMinutes: nonNegativeInt.default(0),
+  defaultPostSessionMinutes: nonNegativeInt.default(0)
+}).strict();
+export const updateAppointmentTypeSchema = createAppointmentTypeSchema.partial().strict();
+
+export const createCollaboratorSchema = z.object({
+  userId: postgresUuid,
+  fullName: z.string().trim().min(1).max(255),
+  specialty: z.string().trim().min(1).max(150),
+  externalId: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(50).optional(),
+  email: optionalEmail,
+  gender: z.string().trim().max(50).optional(),
+  position: z.string().trim().max(100).optional(),
+  clinicIds: z.array(postgresUuid).default([])
+}).strict();
+export const updateCollaboratorSchema = createCollaboratorSchema
+  .omit({ userId: true })
+  .partial()
+  .extend({ status, clinicIds: z.array(postgresUuid).optional() })
+  .strict();
+
+export type CreateClinicInput = z.output<typeof createClinicSchema>;
+export type UpdateClinicInput = z.output<typeof updateClinicSchema>;
+export type CreatePatientInput = z.output<typeof createPatientSchema>;
+export type UpdatePatientInput = z.output<typeof updatePatientSchema>;
+export type CreateRoomInput = z.output<typeof createRoomSchema>;
+export type UpdateRoomInput = z.output<typeof updateRoomSchema>;
+export type CreateAppointmentTypeInput = z.output<typeof createAppointmentTypeSchema>;
+export type UpdateAppointmentTypeInput = z.output<typeof updateAppointmentTypeSchema>;
+export type CreateCollaboratorInput = z.output<typeof createCollaboratorSchema>;
+export type UpdateCollaboratorInput = z.output<typeof updateCollaboratorSchema>;

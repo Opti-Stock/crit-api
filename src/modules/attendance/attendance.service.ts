@@ -1,7 +1,7 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { resolveOperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import type { AttendanceRepository } from "./attendance.repository.js";
-import type { CreateAttendanceInput, ListAttendanceInput } from "./attendance.validation.js";
+import type { CreateAttendanceInput, ListAttendanceInput, UpdateAttendanceInput } from "./attendance.validation.js";
 
 export class AttendanceService {
   constructor(private readonly repository: AttendanceRepository) {}
@@ -26,6 +26,10 @@ export class AttendanceService {
 
   create(context: AuthenticatedRequestContext, input: CreateAttendanceInput) {
     return this.repository.create(context.tenantId, context.userId, context.roles, input);
+  }
+
+  update(context: AuthenticatedRequestContext, attendanceId: string, input: UpdateAttendanceInput) {
+    return this.repository.update(context.tenantId, context.userId, context.roles, attendanceId, input);
   }
 }
 

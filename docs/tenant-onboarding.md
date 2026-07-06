@@ -102,14 +102,15 @@ POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 
 {
-  "tenantCode": "CRIT-NORTE-01",
   "email": "admin.norte@crit.example",
   "password": "una-contrasena-temporal-segura"
 }
 ```
 
 La respuesta debe contener un access token, el `tenantId` resuelto y el rol
-`admin`. Nunca debe contener `password` ni `passwordHash`.
+`admin`. La API resuelve el tenant internamente a partir del email siempre que
+exista una sola coincidencia activa. Nunca debe contener `password` ni
+`passwordHash`.
 
 Tambien puede ejecutarse la prueba integral despues del bootstrap:
 
@@ -126,7 +127,9 @@ terapeutas y demas usuarios. El backend obtiene `tenantId` del JWT; los payloads
 de administracion no aceptan un tenant elegido por el cliente.
 
 Todos los usuarios creados por ese administrador quedan en su mismo tenant y
-deben iniciar sesion con el mismo `tenantCode`.
+deben iniciar sesion con su email y contrasena. Si un mismo email existe en mas
+de un tenant activo, el login se rechaza con el mismo error generico de
+credenciales invalidas.
 
 Despues de comprobar el acceso:
 

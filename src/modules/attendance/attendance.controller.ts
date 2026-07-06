@@ -7,7 +7,8 @@ import { AttendanceService } from "./attendance.service.js";
 import {
   attendanceIdParamsSchema,
   createAttendanceSchema,
-  listAttendanceSchema
+  listAttendanceSchema,
+  updateAttendanceSchema
 } from "./attendance.validation.js";
 
 export class AttendanceController {
@@ -34,5 +35,11 @@ export class AttendanceController {
   readonly create: RequestHandler = async (request, response) => {
     const input = parseWithSchema(createAttendanceSchema, request.body);
     sendSuccess(response, await this.service.create(request.auth!, input), 201);
+  };
+
+  readonly update: RequestHandler = async (request, response) => {
+    const { attendanceId } = parseWithSchema(attendanceIdParamsSchema, request.params);
+    const input = parseWithSchema(updateAttendanceSchema, request.body);
+    sendSuccess(response, await this.service.update(request.auth!, attendanceId, input));
   };
 }

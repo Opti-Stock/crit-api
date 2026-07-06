@@ -28,16 +28,11 @@ const tokenConfig: AuthTokenConfig = {
 };
 
 class FakeAuthRepository implements AuthRepositoryContract {
-  tenantId: string | null = credentials.tenantId;
-  credentialRecord: AuthCredentialRecord | null = credentials;
+  credentialRecords: AuthCredentialRecord[] = [credentials];
   recordedLogin: { tenantId: string; userId: string } | null = null;
 
-  async findTenantIdByCode(): Promise<string | null> {
-    return this.tenantId;
-  }
-
-  async findActiveCredentials(): Promise<AuthCredentialRecord | null> {
-    return this.credentialRecord;
+  async findActiveCredentialsByEmail(): Promise<AuthCredentialRecord[]> {
+    return this.credentialRecords;
   }
 
   async recordSuccessfulLogin(tenantId: string, userId: string): Promise<void> {
@@ -45,15 +40,21 @@ class FakeAuthRepository implements AuthRepositoryContract {
   }
 }
 
-test("login validation normalizes tenant code and email", () => {
+test("login validation normalizes email", () => {
   const result = loginSchema.parse({
-    tenantCode: " crit-occ-01 ",
     email: " Admin@Test.Local ",
     password: "secret"
   });
 
-  assert.equal(result.tenantCode, "CRIT-OCC-01");
   assert.equal(result.email, "admin@test.local");
+});
+
+test("login validation rejects tenant selectors", () => {
+  assert.throws(() => loginSchema.parse({
+    tenantCode: "CRIT-OCC-01",
+    email: "admin@test.local",
+    password: "secret"
+  }));
 });
 
 test("login returns a signed token and a password-free user", async () => {
@@ -61,7 +62,6 @@ test("login returns a signed token and a password-free user", async () => {
   const service = new AuthService(repository, tokenConfig, async () => true);
 
   const result = await service.login({
-    tenantCode: "CRIT-OCC-01",
     email: credentials.email,
     password: "valid-password"
   });
@@ -95,25 +95,28 @@ test("login returns a signed token and a password-free user", async () => {
   assert.deepEqual(payload.roles, ["admin"]);
 });
 
-test("login rejects an unknown tenant with the generic error", async () => {
+test("login rejects missing credentials with the generic error", async () => {
   const repository = new FakeAuthRepository();
-  repository.tenantId = null;
+  repository.credentialRecords = [];
   const service = new AuthService(repository, tokenConfig, async () => true);
 
   await assert.rejects(
-    service.login({ tenantCode: "UNKNOWN", email: credentials.email, password: "secret" }),
+    service.login({ email: credentials.email, password: "secret" }),
     (error: unknown) =>
       error instanceof UnauthorizedError && error.code === "INVALID_CREDENTIALS"
   );
 });
 
-test("login rejects an inactive or missing user with the generic error", async () => {
+test("login rejects ambiguous email matches with the generic error", async () => {
   const repository = new FakeAuthRepository();
-  repository.credentialRecord = null;
+  repository.credentialRecords = [
+    credentials,
+    { ...credentials, id: "20000000-0000-0000-0000-000000000002", tenantId: "00000000-0000-0000-0000-000000000002" }
+  ];
   const service = new AuthService(repository, tokenConfig, async () => true);
 
   await assert.rejects(
-    service.login({ tenantCode: "CRIT-OCC-01", email: credentials.email, password: "secret" }),
+    service.login({ email: credentials.email, password: "secret" }),
     (error: unknown) =>
       error instanceof UnauthorizedError && error.code === "INVALID_CREDENTIALS"
   );
@@ -124,7 +127,7 @@ test("login rejects an invalid password without recording the login", async () =
   const service = new AuthService(repository, tokenConfig, async () => false);
 
   await assert.rejects(
-    service.login({ tenantCode: "CRIT-OCC-01", email: credentials.email, password: "wrong" }),
+    service.login({ email: credentials.email, password: "wrong" }),
     (error: unknown) =>
       error instanceof UnauthorizedError && error.code === "INVALID_CREDENTIALS"
   );

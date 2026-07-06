@@ -6,7 +6,7 @@
 through the non-owner `crit_app` role and never executes DDL at startup.
 
 ```dotenv
-DATABASE_URL=postgresql://crit_app:crit_app@localhost:5432/crit_db
+DATABASE_URL=postgresql://crit_app:crit_app@127.0.0.1:5432/crit_db
 ```
 
 `npm run db:check` executes a connectivity query and verifies that

@@ -4,10 +4,15 @@ export interface AuthenticatedRequestContext {
   roles: string[];
 }
 
+export interface PlatformAuthenticatedRequestContext {
+  superAdminId: string;
+}
+
 declare global {
   namespace Express {
     interface Request {
       auth?: AuthenticatedRequestContext;
+      platformAuth?: PlatformAuthenticatedRequestContext;
     }
   }
 }

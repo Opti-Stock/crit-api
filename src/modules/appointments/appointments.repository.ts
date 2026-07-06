@@ -2,9 +2,9 @@ import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
 import type { OperationalAccessScope } from "../../shared/access/operational-access-scope.js";
-import { BadRequestError, ConflictError, ForbiddenError } from "../../shared/errors/app-error.js";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
-import type { CreateAppointmentInput, ListAppointmentsInput } from "./appointments.validation.js";
+import type { CreateAppointmentInput, ListAppointmentsInput, UpdateAppointmentInput } from "./appointments.validation.js";
 
 export interface AppointmentSummary {
   id: string;
@@ -185,6 +185,80 @@ export class AppointmentsRepository {
           ]
         );
         return (await this.findByIdWithClient(client, tenantId, inserted.rows[0]!.id))!;
+      } catch (error) {
+        throw mapDatabaseError(error);
+      }
+    }, this.databasePool);
+  }
+
+  async update(
+    tenantId: string,
+    actorId: string,
+    appointmentId: string,
+    input: UpdateAppointmentInput,
+    scope: OperationalAccessScope
+  ) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      if (!scope.tenantWide) {
+        const clinicIds = scope.clinics
+          ? await this.resolveAccessibleClinicIds(client, tenantId, actorId)
+          : [];
+        const current = await client.query<{ clinic_id: string }>(
+          `SELECT clinic_id FROM appointments
+           WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [tenantId, appointmentId]
+        );
+        const currentClinicId = current.rows[0]?.clinic_id;
+        if (!currentClinicId || !clinicIds.includes(currentClinicId)) {
+          throw new ForbiddenError(
+            "You cannot update appointments for this clinic",
+            "APPOINTMENT_CLINIC_FORBIDDEN"
+          );
+        }
+        if (input.clinicId && !clinicIds.includes(input.clinicId)) {
+          throw new ForbiddenError(
+            "You cannot move appointments to this clinic",
+            "APPOINTMENT_CLINIC_FORBIDDEN"
+          );
+        }
+      }
+
+      try {
+        const result = await client.query<{ id: string }>(
+          `UPDATE appointments
+           SET patient_id = COALESCE($3, patient_id),
+               collaborator_id = COALESCE($4, collaborator_id),
+               clinic_id = COALESCE($5, clinic_id),
+               room_id = COALESCE($6, room_id),
+               appointment_type_id = COALESCE($7, appointment_type_id),
+               starts_at = COALESCE($8, starts_at),
+               ends_at = COALESCE($9, ends_at),
+               pre_session_minutes = COALESCE($10, pre_session_minutes),
+               post_session_minutes = COALESCE($11, post_session_minutes),
+               status = COALESCE($12, status),
+               updated_by_user_id = $13
+           WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+           RETURNING id`,
+          [
+            tenantId,
+            appointmentId,
+            input.patientId ?? null,
+            input.collaboratorId ?? null,
+            input.clinicId ?? null,
+            input.roomId ?? null,
+            input.appointmentTypeId ?? null,
+            input.startsAt ?? null,
+            input.endsAt ?? null,
+            input.preSessionMinutes ?? null,
+            input.postSessionMinutes ?? null,
+            input.status ?? null,
+            actorId
+          ]
+        );
+        if (result.rowCount === 0) {
+          throw new NotFoundError("Appointment not found", "APPOINTMENT_NOT_FOUND");
+        }
+        return (await this.findByIdWithClient(client, tenantId, appointmentId))!;
       } catch (error) {
         throw mapDatabaseError(error);
       }

@@ -140,7 +140,7 @@ Acceptance criteria:
 - No hardcoded users.
 - JWT strategy is prepared.
 - Password hashing uses bcrypt.
-- Login accepts `tenantCode`, `email`, and `password`.
+- Login accepts `email` and `password`; tenant is resolved internally from a unique active email.
 - JWT/user context includes `userId`, `tenantId`, and roles.
 - Does not expose password hashes.
 

@@ -13,13 +13,8 @@ export interface AuthCredentialRecord {
 }
 
 export interface AuthRepositoryContract {
-  findTenantIdByCode(tenantCode: string): Promise<string | null>;
-  findActiveCredentials(tenantId: string, email: string): Promise<AuthCredentialRecord | null>;
+  findActiveCredentialsByEmail(email: string): Promise<AuthCredentialRecord[]>;
   recordSuccessfulLogin(tenantId: string, userId: string): Promise<void>;
-}
-
-interface TenantRow {
-  id: string;
 }
 
 interface CredentialRow {
@@ -31,24 +26,62 @@ interface CredentialRow {
   roles: string[];
 }
 
+interface TenantRow {
+  id: string;
+}
+
 export class AuthRepository implements AuthRepositoryContract {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  async findTenantIdByCode(tenantCode: string): Promise<string | null> {
+  async findActiveCredentialsByEmail(email: string): Promise<AuthCredentialRecord[]> {
+    const tenants = await this.listActiveTenants();
+    const matches: AuthCredentialRecord[] = [];
+
+    for (const tenantId of tenants) {
+      const credentials = await this.findActiveCredentialsInTenant(tenantId, email);
+      if (credentials) {
+        matches.push(credentials);
+      }
+
+      if (matches.length > 1) {
+        break;
+      }
+    }
+
+    return matches;
+  }
+
+  async recordSuccessfulLogin(tenantId: string, userId: string): Promise<void> {
+    await withTenantTransaction(
+      { tenantId, userId },
+      async (client) => {
+        await client.query(
+          `UPDATE users
+           SET last_login_at = CURRENT_TIMESTAMP
+           WHERE tenant_id = $1
+             AND id = $2
+             AND status = 'active'
+             AND deleted_at IS NULL`,
+          [tenantId, userId]
+        );
+      },
+      this.databasePool
+    );
+  }
+
+  private async listActiveTenants(): Promise<string[]> {
     const result = await this.databasePool.query<TenantRow>(
       `SELECT id
        FROM tenants
-       WHERE upper(code) = $1
-         AND status = 'active'
+       WHERE status = 'active'
          AND deleted_at IS NULL
-       LIMIT 1`,
-      [tenantCode]
+       ORDER BY id`
     );
 
-    return result.rows[0]?.id ?? null;
+    return result.rows.map((row) => row.id);
   }
 
-  async findActiveCredentials(
+  private async findActiveCredentialsInTenant(
     tenantId: string,
     email: string
   ): Promise<AuthCredentialRecord | null> {
@@ -96,24 +129,6 @@ export class AuthRepository implements AuthRepositoryContract {
           passwordHash: row.password_hash,
           roles: row.roles
         };
-      },
-      this.databasePool
-    );
-  }
-
-  async recordSuccessfulLogin(tenantId: string, userId: string): Promise<void> {
-    await withTenantTransaction(
-      { tenantId, userId },
-      async (client) => {
-        await client.query(
-          `UPDATE users
-           SET last_login_at = CURRENT_TIMESTAMP
-           WHERE tenant_id = $1
-             AND id = $2
-             AND status = 'active'
-             AND deleted_at IS NULL`,
-          [tenantId, userId]
-        );
       },
       this.databasePool
     );

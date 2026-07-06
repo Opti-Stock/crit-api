@@ -6,7 +6,7 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from ".
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import { insertAttendanceRegisteredEvent } from "../../integrations/crit-post-api/crit-post-api.payload.js";
 import { insertNotification } from "../notifications/notifications.repository.js";
-import type { CreateAttendanceInput, ListAttendanceInput } from "./attendance.validation.js";
+import type { CreateAttendanceInput, ListAttendanceInput, UpdateAttendanceInput } from "./attendance.validation.js";
 
 export interface AttendanceSummary {
   id: string;
@@ -203,6 +203,58 @@ export class AttendanceRepository {
         }
 
         return (await this.findByIdWithClient(client, tenantId, attendance.id))!;
+      } catch (error) {
+        throw mapDatabaseError(error);
+      }
+    }, this.databasePool);
+  }
+
+  async update(
+    tenantId: string,
+    actorId: string,
+    actorRoles: string[],
+    attendanceId: string,
+    input: UpdateAttendanceInput
+  ) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const current = await client.query<{ collaborator_id: string }>(
+        `SELECT collaborator_id
+         FROM attendance_records
+         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+        [tenantId, attendanceId]
+      );
+      const currentRow = current.rows[0];
+      if (!currentRow) throw new NotFoundError("Attendance record not found", "ATTENDANCE_NOT_FOUND");
+
+      const isTenantWide = actorRoles.some((role) => role === "admin" || role === "direccion");
+      if (!isTenantWide) {
+        const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+        if (ownCollaboratorId !== currentRow.collaborator_id) {
+          throw new ForbiddenError(
+            "You can only update attendance for your own appointments",
+            "ATTENDANCE_NOT_OWNED"
+          );
+        }
+      }
+
+      try {
+        await client.query(
+          `UPDATE attendance_records
+           SET status = COALESCE($3, status),
+               checked_by_user_id = CASE
+                 WHEN COALESCE($3, status) = 'pending' THEN checked_by_user_id
+                 ELSE $4
+               END,
+               checked_at = CASE
+                 WHEN COALESCE($3, status) = 'pending' THEN NULL
+                 WHEN $3 IS NULL THEN checked_at
+                 ELSE CURRENT_TIMESTAMP
+               END,
+               notes_required = COALESCE($5, notes_required)
+           WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [tenantId, attendanceId, input.status ?? null, actorId, input.notesRequired ?? null]
+        );
+        return (await this.findByIdWithClient(client, tenantId, attendanceId))!;
       } catch (error) {
         throw mapDatabaseError(error);
       }

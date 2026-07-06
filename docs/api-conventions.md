@@ -4,7 +4,8 @@
 
 - Main API: `http://localhost:3000/api`
 - Admin API: `http://localhost:3001/admin`
-- Check-in API: `http://localhost:3002`; actualmente solo expone `/health`.
+- Check-in API: `http://localhost:3002/checkin`
+- Super admin API: `http://localhost:3003/super-admin`
 
 ## Respuestas
 
@@ -69,8 +70,10 @@ incluyen path y mensaje:
 
 ## Autenticacion
 
-`POST /api/auth/login` es publico. Las demas rutas funcionales usan el pipeline
-de autenticacion y tenant; `GET /api/auth/me` devuelve el contexto validado.
+`POST /api/auth/login` es publico y recibe solo `email` y `password`. El tenant
+se resuelve internamente cuando el email corresponde a un unico usuario activo
+en un tenant activo. Las demas rutas funcionales usan el pipeline de
+autenticacion y tenant; `GET /api/auth/me` devuelve el contexto validado.
 
 Los access tokens se verifican con HS256, expiracion, issuer y audience. El
 tenant se deriva exclusivamente del claim `tenantId`. Los selectores
