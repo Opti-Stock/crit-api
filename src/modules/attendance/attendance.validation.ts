@@ -5,7 +5,10 @@ const postgresUuid = z.string().regex(
   "Invalid UUID"
 );
 
-const REGISTERED_STATUSES = ["present", "absent", "late", "cancelled", "rescheduled"] as const;
+const optionalString = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
+
+const REGISTERED_STATUSES = ["present", "absent", "rescheduled"] as const;
 const ATTENDANCE_STATUSES = ["pending", ...REGISTERED_STATUSES] as const;
 
 export const attendanceIdParamsSchema = z.object({ attendanceId: postgresUuid });
@@ -13,12 +16,12 @@ export const attendanceIdParamsSchema = z.object({ attendanceId: postgresUuid })
 export const listAttendanceSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  from: z.iso.datetime().optional(),
-  to: z.iso.datetime().optional(),
-  status: z.enum(ATTENDANCE_STATUSES).optional(),
-  clinicId: postgresUuid.optional(),
-  patientId: postgresUuid.optional(),
-  collaboratorId: postgresUuid.optional()
+  from: optionalString(z.iso.datetime()),
+  to: optionalString(z.iso.datetime()),
+  status: optionalString(z.enum(ATTENDANCE_STATUSES)),
+  clinicId: optionalString(postgresUuid),
+  patientId: optionalString(postgresUuid),
+  collaboratorId: optionalString(postgresUuid)
 });
 
 export const createAttendanceSchema = z.object({

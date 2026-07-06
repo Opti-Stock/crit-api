@@ -1,10 +1,9 @@
 import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
-import { insertAttendanceRegisteredEvent } from "../../integrations/crit-post-api/crit-post-api.payload.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import { ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
-import type { ListCheckinAppointmentsInput, CheckInAppointmentInput } from "./checkin.validation.js";
+import type { ListCheckinAppointmentsInput } from "./checkin.validation.js";
 
 export interface CheckinAppointmentSummary {
   id: string;
@@ -15,6 +14,10 @@ export interface CheckinAppointmentSummary {
   startsAt: string;
   endsAt: string;
   status: string;
+  attendanceStatus: string | null;
+  checkInStatus: "checked_in" | "not_checked_in";
+  isCheckedIn: boolean;
+  checkedInAt: string | null;
   attendance: {
     id: string;
     status: string;
@@ -35,6 +38,8 @@ interface CheckinAppointmentRow {
   starts_at: string;
   ends_at: string;
   status: string;
+  check_in_id: string | null;
+  checked_in_at: string | null;
   attendance_id: string | null;
   attendance_status: string | null;
   checked_at: string | null;
@@ -47,6 +52,7 @@ const SELECT_CHECKIN_APPOINTMENT = `
     a.clinic_id, cl.name AS clinic_name,
     a.room_id, r.name AS room_name,
     a.starts_at, a.ends_at, a.status,
+    aci.id AS check_in_id, aci.checked_in_at,
     ar.id AS attendance_id, ar.status AS attendance_status, ar.checked_at
   FROM appointments a
   JOIN patients p ON p.tenant_id = a.tenant_id AND p.id = a.patient_id
@@ -57,6 +63,10 @@ const SELECT_CHECKIN_APPOINTMENT = `
     ON ar.tenant_id = a.tenant_id
    AND ar.appointment_id = a.id
    AND ar.deleted_at IS NULL
+  LEFT JOIN appointment_check_ins aci
+    ON aci.tenant_id = a.tenant_id
+   AND aci.appointment_id = a.id
+   AND aci.deleted_at IS NULL
 `;
 
 export class CheckinRepository {
@@ -85,6 +95,12 @@ export class CheckinRepository {
       if (input.status) {
         values.push(input.status);
         filters.push(`a.status = $${values.length}`);
+      }
+      if (input.checkInStatus === "checked_in") {
+        filters.push("aci.id IS NOT NULL");
+      }
+      if (input.checkInStatus === "not_checked_in") {
+        filters.push("aci.id IS NULL");
       }
       if (input.search) {
         values.push(`%${input.search}%`);
@@ -123,8 +139,7 @@ export class CheckinRepository {
     tenantId: string,
     actorId: string,
     actorRoles: string[],
-    appointmentId: string,
-    input: CheckInAppointmentInput
+    appointmentId: string
   ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const appointment = await client.query<{
@@ -142,7 +157,7 @@ export class CheckinRepository {
       await this.assertCanAccessClinic(client, tenantId, actorId, actorRoles, appointmentRow.clinic_id);
 
       const existing = await client.query<{ id: string }>(
-        `SELECT id FROM attendance_records
+        `SELECT id FROM appointment_check_ins
          WHERE tenant_id = $1 AND appointment_id = $2 AND deleted_at IS NULL`,
         [tenantId, appointmentId]
       );
@@ -150,32 +165,17 @@ export class CheckinRepository {
         throw new ConflictError("Appointment already has attendance", "CHECKIN_ALREADY_REGISTERED");
       }
 
-      const inserted = await client.query<{ id: string; checked_at: Date | string }>(
-        `INSERT INTO attendance_records (
-           tenant_id, appointment_id, patient_id, collaborator_id,
-           checked_by_user_id, status, checked_at, notes_required
-         ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, FALSE)
-         RETURNING id, checked_at`,
+      await client.query(
+        `INSERT INTO appointment_check_ins (
+           tenant_id, appointment_id, patient_id, checked_in_by_user_id
+         ) VALUES ($1, $2, $3, $4)`,
         [
           tenantId,
           appointmentId,
           appointmentRow.patient_id,
-          appointmentRow.collaborator_id,
-          actorId,
-          input.status
+          actorId
         ]
       );
-      const attendance = inserted.rows[0]!;
-
-      await insertAttendanceRegisteredEvent(client, {
-        tenantId,
-        attendanceId: attendance.id,
-        appointmentId,
-        patientId: appointmentRow.patient_id,
-        collaboratorId: appointmentRow.collaborator_id,
-        status: input.status,
-        checkedAt: toIsoString(attendance.checked_at)
-      });
 
       return this.getAppointmentWithClient(client, tenantId, appointmentId);
     }, this.databasePool);
@@ -245,6 +245,10 @@ function mapAppointment(row: CheckinAppointmentRow): CheckinAppointmentSummary {
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,
+    attendanceStatus: row.attendance_status,
+    checkInStatus: row.check_in_id ? "checked_in" : "not_checked_in",
+    isCheckedIn: Boolean(row.check_in_id),
+    checkedInAt: row.checked_in_at,
     attendance: row.attendance_id
       ? {
           id: row.attendance_id,
@@ -253,8 +257,4 @@ function mapAppointment(row: CheckinAppointmentRow): CheckinAppointmentSummary {
         }
       : null
   };
-}
-
-function toIsoString(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }

@@ -6,11 +6,11 @@ export class HandoffNotesService {
   constructor(private readonly repository = new HandoffNotesRepository()) {}
 
   list(context: AuthenticatedRequestContext, input: ListHandoffNotesInput) {
-    return this.repository.list(context.tenantId, context.userId, input);
+    return this.repository.list(context.tenantId, context.userId, context.roles, input);
   }
 
   get(context: AuthenticatedRequestContext, handoffNoteId: string) {
-    return this.repository.findById(context.tenantId, context.userId, handoffNoteId);
+    return this.repository.findById(context.tenantId, context.userId, context.roles, handoffNoteId);
   }
 
   create(context: AuthenticatedRequestContext, input: CreateHandoffNoteInput) {

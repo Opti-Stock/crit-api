@@ -5,19 +5,22 @@ const postgresUuid = z.string().regex(
   "Invalid UUID"
 );
 
-const APPOINTMENT_STATUSES = ["scheduled", "confirmed", "completed", "cancelled", "rescheduled"] as const;
+const optionalString = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
+
+const APPOINTMENT_STATUSES = ["scheduled", "cancelled", "rescheduled"] as const;
 
 export const appointmentIdParamsSchema = z.object({ appointmentId: postgresUuid });
 
 export const listAppointmentsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  from: z.iso.datetime().optional(),
-  to: z.iso.datetime().optional(),
-  status: z.enum(APPOINTMENT_STATUSES).optional(),
-  clinicId: postgresUuid.optional(),
-  patientId: postgresUuid.optional(),
-  collaboratorId: postgresUuid.optional()
+  from: optionalString(z.iso.datetime()),
+  to: optionalString(z.iso.datetime()),
+  status: optionalString(z.enum(APPOINTMENT_STATUSES)),
+  clinicId: optionalString(postgresUuid),
+  patientId: optionalString(postgresUuid),
+  collaboratorId: optionalString(postgresUuid)
 });
 
 export const createAppointmentSchema = z

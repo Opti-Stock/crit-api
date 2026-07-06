@@ -17,7 +17,8 @@ const credentials: AuthCredentialRecord = {
   fullName: "Test Administrator",
   email: "admin@test.local",
   passwordHash: "stored-hash",
-  roles: ["admin"]
+  roles: ["admin"],
+  collaboratorId: null
 };
 
 const tokenConfig: AuthTokenConfig = {
@@ -73,7 +74,8 @@ test("login returns a signed token and a password-free user", async () => {
     tenantId: credentials.tenantId,
     fullName: credentials.fullName,
     email: credentials.email,
-    roles: credentials.roles
+    roles: credentials.roles,
+    collaboratorId: null
   });
   assert.equal("passwordHash" in result.user, false);
   assert.deepEqual(repository.recordedLogin, {

@@ -5,13 +5,16 @@ const postgresUuid = z.string().regex(
   "Invalid UUID"
 );
 
+const optionalString = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
+
 export const handoffNoteIdParamsSchema = z.object({ handoffNoteId: postgresUuid });
 
 export const listHandoffNotesSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  status: z.enum(["pending", "read", "archived"]).optional(),
-  priority: z.enum(["low", "medium", "high", "urgent"]).optional()
+  status: optionalString(z.enum(["pending", "read", "archived"])),
+  priority: optionalString(z.enum(["low", "medium", "high", "urgent"]))
 });
 
 export const createHandoffNoteSchema = z.object({
