@@ -15,6 +15,7 @@ export interface AuthenticatedUser {
   fullName: string;
   email: string;
   roles: string[];
+  collaboratorId: string | null;
 }
 
 export interface LoginResult {
@@ -64,7 +65,8 @@ export class AuthService {
         tenantId: credentials.tenantId,
         fullName: credentials.fullName,
         email: credentials.email,
-        roles: credentials.roles
+        roles: credentials.roles,
+        collaboratorId: credentials.collaboratorId
       }
     };
   }

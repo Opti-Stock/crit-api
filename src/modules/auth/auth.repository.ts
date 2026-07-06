@@ -10,6 +10,7 @@ export interface AuthCredentialRecord {
   email: string;
   passwordHash: string;
   roles: string[];
+  collaboratorId: string | null;
 }
 
 export interface AuthRepositoryContract {
@@ -24,6 +25,7 @@ interface CredentialRow {
   email: string;
   password_hash: string;
   roles: string[];
+  collaborator_id: string | null;
 }
 
 interface TenantRow {
@@ -95,6 +97,7 @@ export class AuthRepository implements AuthRepositoryContract {
              u.full_name,
              u.email,
              u.password_hash,
+             c.id AS collaborator_id,
              COALESCE(
                array_agg(r.name ORDER BY r.name) FILTER (WHERE r.id IS NOT NULL),
                ARRAY[]::varchar[]
@@ -103,10 +106,14 @@ export class AuthRepository implements AuthRepositoryContract {
            LEFT JOIN user_roles ur
              ON ur.tenant_id = u.tenant_id
             AND ur.user_id = u.id
-           LEFT JOIN roles r
+          LEFT JOIN roles r
              ON r.tenant_id = ur.tenant_id
             AND r.id = ur.role_id
             AND r.deleted_at IS NULL
+           LEFT JOIN collaborators c
+             ON c.tenant_id = u.tenant_id
+            AND c.user_id = u.id
+            AND c.deleted_at IS NULL
            WHERE u.tenant_id = $1
              AND lower(u.email) = $2
              AND u.status = 'active'
@@ -127,7 +134,8 @@ export class AuthRepository implements AuthRepositoryContract {
           fullName: row.full_name,
           email: row.email,
           passwordHash: row.password_hash,
-          roles: row.roles
+          roles: row.roles,
+          collaboratorId: row.collaborator_id
         };
       },
       this.databasePool

@@ -70,10 +70,14 @@ function visibilityClause(actorParam: string): string {
 export class HandoffNotesRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  async list(tenantId: string, actorId: string, input: ListHandoffNotesInput) {
+  async list(tenantId: string, actorId: string, actorRoles: string[], input: ListHandoffNotesInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
-      const filters = ["hn.tenant_id = $1", "hn.deleted_at IS NULL", visibilityClause("$2")];
-      const values: unknown[] = [tenantId, actorId];
+      const filters = ["hn.tenant_id = $1", "hn.deleted_at IS NULL"];
+      const values: unknown[] = [tenantId];
+      if (!this.canReadTenantWide(actorRoles)) {
+        values.push(actorId);
+        filters.push(visibilityClause(`$${values.length}`));
+      }
 
       if (input.status) {
         values.push(input.status);
@@ -106,10 +110,11 @@ export class HandoffNotesRepository {
   async findById(
     tenantId: string,
     actorId: string,
+    actorRoles: string[],
     handoffNoteId: string
   ): Promise<HandoffNoteSummary | null> {
     return withTenantTransaction({ tenantId, userId: actorId }, (client) =>
-      this.findByIdWithClient(client, tenantId, actorId, handoffNoteId), this.databasePool);
+      this.findByIdWithClient(client, tenantId, actorId, actorRoles, handoffNoteId), this.databasePool);
   }
 
   async create(tenantId: string, actorId: string, input: CreateHandoffNoteInput) {
@@ -151,7 +156,7 @@ export class HandoffNotesRepository {
           });
         }
 
-        return (await this.findByIdWithClient(client, tenantId, actorId, handoffNoteId))!;
+        return (await this.findByIdWithClient(client, tenantId, actorId, [], handoffNoteId))!;
       } catch (error) {
         throw mapDatabaseError(error);
       }
@@ -185,7 +190,7 @@ export class HandoffNotesRepository {
         [tenantId, handoffNoteId]
       );
 
-      return (await this.findByIdWithClient(client, tenantId, actorId, handoffNoteId))!;
+      return (await this.findByIdWithClient(client, tenantId, actorId, [], handoffNoteId))!;
     }, this.databasePool);
   }
 
@@ -193,14 +198,23 @@ export class HandoffNotesRepository {
     client: PoolClient,
     tenantId: string,
     actorId: string,
+    actorRoles: string[],
     handoffNoteId: string
   ) {
+    const values: unknown[] = [tenantId, handoffNoteId];
+    const visibility = this.canReadTenantWide(actorRoles)
+      ? "TRUE"
+      : visibilityClause(`$${values.push(actorId)}`);
     const result = await client.query<HandoffNoteRow>(
       `${SELECT_HANDOFF_NOTE}
-       WHERE hn.tenant_id = $1 AND hn.id = $2 AND hn.deleted_at IS NULL AND ${visibilityClause("$3")}`,
-      [tenantId, handoffNoteId, actorId]
+       WHERE hn.tenant_id = $1 AND hn.id = $2 AND hn.deleted_at IS NULL AND ${visibility}`,
+      values
     );
     return result.rows[0] ? mapSummary(result.rows[0]) : null;
+  }
+
+  private canReadTenantWide(actorRoles: string[]) {
+    return actorRoles.some((role) => role === "admin" || role === "direccion");
   }
 
   private async assertValidRecipients(client: PoolClient, tenantId: string, recipientIds: string[]) {

@@ -18,6 +18,9 @@ export interface AppointmentSummary {
   preSessionMinutes: number;
   postSessionMinutes: number;
   status: string;
+  attendanceStatus: string | null;
+  checkInStatus: "checked_in" | "not_checked_in";
+  isCheckedIn: boolean;
 }
 
 interface AppointmentRow {
@@ -37,6 +40,8 @@ interface AppointmentRow {
   pre_session_minutes: number;
   post_session_minutes: number;
   status: string;
+  attendance_status: string | null;
+  check_in_id: string | null;
 }
 
 const SELECT_APPOINTMENT = `
@@ -46,13 +51,23 @@ const SELECT_APPOINTMENT = `
     a.clinic_id, cl.name AS clinic_name,
     a.room_id, r.name AS room_name,
     a.appointment_type_id, at.name AS appointment_type_name,
-    a.starts_at, a.ends_at, a.pre_session_minutes, a.post_session_minutes, a.status
+    a.starts_at, a.ends_at, a.pre_session_minutes, a.post_session_minutes, a.status,
+    ar.status AS attendance_status,
+    aci.id AS check_in_id
   FROM appointments a
   JOIN patients p ON p.tenant_id = a.tenant_id AND p.id = a.patient_id
   JOIN collaborators co ON co.tenant_id = a.tenant_id AND co.id = a.collaborator_id
   JOIN clinics cl ON cl.tenant_id = a.tenant_id AND cl.id = a.clinic_id
   JOIN rooms r ON r.tenant_id = a.tenant_id AND r.id = a.room_id
   JOIN appointment_types at ON at.tenant_id = a.tenant_id AND at.id = a.appointment_type_id
+  LEFT JOIN attendance_records ar
+    ON ar.tenant_id = a.tenant_id
+   AND ar.appointment_id = a.id
+   AND ar.deleted_at IS NULL
+  LEFT JOIN appointment_check_ins aci
+    ON aci.tenant_id = a.tenant_id
+   AND aci.appointment_id = a.id
+   AND aci.deleted_at IS NULL
 `;
 
 export class AppointmentsRepository {
@@ -164,6 +179,15 @@ export class AppointmentsRepository {
       }
 
       try {
+        await this.assertNoScheduleConflict(client, tenantId, {
+          patientId: input.patientId,
+          collaboratorId: input.collaboratorId,
+          clinicId: input.clinicId,
+          roomId: input.roomId,
+          startsAt: input.startsAt,
+          endsAt: input.endsAt
+        });
+
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO appointments (
              tenant_id, patient_id, collaborator_id, clinic_id, room_id, appointment_type_id,
@@ -224,6 +248,34 @@ export class AppointmentsRepository {
       }
 
       try {
+        const current = await client.query<{
+          patient_id: string;
+          collaborator_id: string;
+          clinic_id: string;
+          room_id: string;
+          starts_at: string;
+          ends_at: string;
+        }>(
+          `SELECT patient_id, collaborator_id, clinic_id, room_id, starts_at, ends_at
+           FROM appointments
+           WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [tenantId, appointmentId]
+        );
+        const currentRow = current.rows[0];
+        if (!currentRow) {
+          throw new NotFoundError("Appointment not found", "APPOINTMENT_NOT_FOUND");
+        }
+
+        await this.assertNoScheduleConflict(client, tenantId, {
+          patientId: input.patientId ?? currentRow.patient_id,
+          collaboratorId: input.collaboratorId ?? currentRow.collaborator_id,
+          clinicId: input.clinicId ?? currentRow.clinic_id,
+          roomId: input.roomId ?? currentRow.room_id,
+          startsAt: input.startsAt ?? currentRow.starts_at,
+          endsAt: input.endsAt ?? currentRow.ends_at,
+          excludeAppointmentId: appointmentId
+        });
+
         const result = await client.query<{ id: string }>(
           `UPDATE appointments
            SET patient_id = COALESCE($3, patient_id),
@@ -270,6 +322,72 @@ export class AppointmentsRepository {
       client,
       ["a.tenant_id = $1", "a.id = $2", "a.deleted_at IS NULL"],
       [tenantId, appointmentId]
+    );
+  }
+
+  private async assertNoScheduleConflict(
+    client: PoolClient,
+    tenantId: string,
+    input: {
+      patientId: string;
+      collaboratorId: string;
+      clinicId: string;
+      roomId: string;
+      startsAt: string;
+      endsAt: string;
+      excludeAppointmentId?: string;
+    }
+  ) {
+    const values: unknown[] = [
+      tenantId,
+      input.startsAt,
+      input.endsAt,
+      input.patientId,
+      input.collaboratorId,
+      input.clinicId,
+      input.roomId
+    ];
+    const filters = [
+      "tenant_id = $1",
+      "deleted_at IS NULL",
+      "status <> 'cancelled'",
+      "starts_at < $3",
+      "ends_at > $2",
+      "(patient_id = $4 OR collaborator_id = $5 OR (clinic_id = $6 AND room_id = $7))"
+    ];
+
+    if (input.excludeAppointmentId) {
+      values.push(input.excludeAppointmentId);
+      filters.push(`id <> $${values.length}`);
+    }
+
+    const conflict = await client.query<{
+      id: string;
+      patient_id: string;
+      collaborator_id: string;
+      clinic_id: string;
+      room_id: string;
+    }>(
+      `SELECT id, patient_id, collaborator_id, clinic_id, room_id
+       FROM appointments
+       WHERE ${filters.join(" AND ")}
+       ORDER BY starts_at
+       LIMIT 1`,
+      values
+    );
+    const row = conflict.rows[0];
+    if (!row) return;
+
+    const resource =
+      row.patient_id === input.patientId
+        ? "patient"
+        : row.collaborator_id === input.collaboratorId
+          ? "collaborator"
+          : "room";
+
+    throw new ConflictError(
+      `Appointment overlaps an existing ${resource} appointment`,
+      "APPOINTMENT_TIME_CONFLICT"
     );
   }
 
@@ -340,7 +458,10 @@ function mapSummary(row: AppointmentRow): AppointmentSummary {
     endsAt: row.ends_at,
     preSessionMinutes: row.pre_session_minutes,
     postSessionMinutes: row.post_session_minutes,
-    status: row.status
+    status: row.status,
+    attendanceStatus: row.attendance_status,
+    checkInStatus: row.check_in_id ? "checked_in" : "not_checked_in",
+    isCheckedIn: Boolean(row.check_in_id)
   };
 }
 
