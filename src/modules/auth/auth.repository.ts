@@ -97,7 +97,7 @@ export class AuthRepository implements AuthRepositoryContract {
              u.full_name,
              u.email,
              u.password_hash,
-             c.id AS collaborator_id,
+             max(c.id::text) AS collaborator_id,
              COALESCE(
                array_agg(r.name ORDER BY r.name) FILTER (WHERE r.id IS NOT NULL),
                ARRAY[]::varchar[]
