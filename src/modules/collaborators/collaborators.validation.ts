@@ -12,7 +12,8 @@ export const listCollaboratorsSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().max(255).optional(),
   status: z.enum(["active", "inactive"]).optional(),
-  clinicId: postgresUuid.optional()
+  clinicId: postgresUuid.optional(),
+  role: z.enum(["medico", "terapeuta"]).optional()
 });
 
 export type ListCollaboratorsInput = z.output<typeof listCollaboratorsSchema>;

@@ -26,7 +26,8 @@ export const createNotificationSchema = z.object({
   userId: postgresUuid,
   type: z.enum(NOTIFICATION_TYPES),
   title: z.string().trim().min(1).max(150),
-  message: z.string().trim().min(1)
+  message: z.string().trim().min(1),
+  metadata: z.record(z.string(), z.unknown()).optional()
 });
 
 export type ListNotificationsInput = z.output<typeof listNotificationsSchema>;

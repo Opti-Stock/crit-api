@@ -6,11 +6,11 @@ export class MedicalNotesService {
   constructor(private readonly repository = new MedicalNotesRepository()) {}
 
   list(context: AuthenticatedRequestContext, input: ListMedicalNotesInput) {
-    return this.repository.list(context.tenantId, context.userId, input);
+    return this.repository.list(context.tenantId, context.userId, context.roles, input);
   }
 
   get(context: AuthenticatedRequestContext, medicalNoteId: string) {
-    return this.repository.findById(context.tenantId, context.userId, medicalNoteId);
+    return this.repository.findById(context.tenantId, context.userId, context.roles, medicalNoteId);
   }
 
   create(context: AuthenticatedRequestContext, input: CreateMedicalNoteInput) {

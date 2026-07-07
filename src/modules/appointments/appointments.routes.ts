@@ -21,11 +21,11 @@ appointmentsRouter.get("/", controller.list);
 appointmentsRouter.get("/:appointmentId", controller.get);
 appointmentsRouter.post(
   "/",
-  requireRoles("admin", "direccion", "recepcion", "coordinador"),
+  requireRoles("recepcion", "coordinador"),
   controller.create
 );
 appointmentsRouter.patch(
   "/:appointmentId",
-  requireRoles("admin", "direccion", "recepcion", "coordinador"),
+  requireRoles("recepcion", "coordinador"),
   controller.update
 );

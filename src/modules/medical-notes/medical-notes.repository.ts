@@ -55,25 +55,32 @@ const SELECT_MEDICAL_NOTE = `
 export class MedicalNotesRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  async list(tenantId: string, actorId: string, input: ListMedicalNotesInput) {
+  async list(tenantId: string, actorId: string, actorRoles: string[], input: ListMedicalNotesInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const filters = ["mn.tenant_id = $1", "mn.deleted_at IS NULL"];
       const values: unknown[] = [tenantId];
-      const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      const canReadTenantWide = actorRoles.some((role) =>
+        role === "admin" || role === "direccion" || role === "coordinador"
+      );
+      const ownCollaboratorId = canReadTenantWide
+        ? null
+        : await this.resolveOwnCollaboratorId(client, tenantId, actorId);
 
-      if (!ownCollaboratorId) {
-        return { notes: [], total: 0 };
+      if (!canReadTenantWide) {
+        if (!ownCollaboratorId) {
+          return { notes: [], total: 0 };
+        }
+
+        values.push(ownCollaboratorId);
+        filters.push(`mn.collaborator_id = $${values.length}`);
       }
-
-      values.push(ownCollaboratorId);
-      filters.push(`mn.collaborator_id = $${values.length}`);
 
       if (input.patientId) {
         values.push(input.patientId);
         filters.push(`mn.patient_id = $${values.length}`);
       }
       if (input.collaboratorId) {
-        if (input.collaboratorId !== ownCollaboratorId) {
+        if (!canReadTenantWide && input.collaboratorId !== ownCollaboratorId) {
           return { notes: [], total: 0 };
         }
         values.push(input.collaboratorId);
@@ -102,11 +109,16 @@ export class MedicalNotesRepository {
   async findById(
     tenantId: string,
     actorId: string,
+    actorRoles: string[],
     medicalNoteId: string
   ): Promise<MedicalNoteSummary | null> {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const note = await this.findByIdWithClient(client, tenantId, medicalNoteId);
       if (!note) return null;
+
+      if (actorRoles.some((role) => role === "admin" || role === "direccion" || role === "coordinador")) {
+        return note;
+      }
 
       const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
       return ownCollaboratorId === note.collaborator.id ? note : null;

@@ -11,9 +11,9 @@ export const medicalNotesRouter = Router();
 medicalNotesRouter.use(
   authenticateRequest,
   requireTenantContext,
-  requireRoles("medico", "terapeuta")
+  requireRoles("admin", "direccion", "coordinador", "medico", "terapeuta")
 );
 medicalNotesRouter.get("/", controller.list);
 medicalNotesRouter.get("/:medicalNoteId", controller.get);
-medicalNotesRouter.post("/", controller.create);
-medicalNotesRouter.patch("/:medicalNoteId", controller.update);
+medicalNotesRouter.post("/", requireRoles("medico", "terapeuta"), controller.create);
+medicalNotesRouter.patch("/:medicalNoteId", requireRoles("medico", "terapeuta"), controller.update);

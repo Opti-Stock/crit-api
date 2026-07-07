@@ -14,6 +14,7 @@ export interface CollaboratorSummary {
   email: string | null;
   gender: string | null;
   status: "active" | "inactive";
+  roles: string[];
 }
 
 export interface CollaboratorDetail extends CollaboratorSummary {
@@ -30,6 +31,7 @@ interface CollaboratorRow {
   email: string | null;
   gender: string | null;
   status: "active" | "inactive";
+  roles: string[];
 }
 
 interface CollaboratorDetailRow extends CollaboratorRow {
@@ -60,6 +62,17 @@ export class CollaboratorsRepository {
         values.push(input.status);
         filters.push(`c.status = $${values.length}`);
       }
+      if (input.role) {
+        joins.push(
+          "JOIN user_roles role_filter_ur ON role_filter_ur.tenant_id = c.tenant_id AND role_filter_ur.user_id = c.user_id"
+        );
+        joins.push(
+          "JOIN roles role_filter_r ON role_filter_r.tenant_id = role_filter_ur.tenant_id AND role_filter_r.id = role_filter_ur.role_id"
+        );
+        values.push(input.role);
+        filters.push(`role_filter_r.name = $${values.length}`);
+        filters.push("role_filter_r.deleted_at IS NULL");
+      }
 
       const join = joins.join(" ");
       const where = filters.join(" AND ");
@@ -70,7 +83,16 @@ export class CollaboratorsRepository {
 
       values.push(input.pageSize, (input.page - 1) * input.pageSize);
       const rows = await client.query<CollaboratorRow>(
-        `SELECT DISTINCT c.id, c.full_name, c.external_id, c.specialty, c.position, c.phone, c.email, c.gender, c.status
+        `SELECT DISTINCT c.id, c.full_name, c.external_id, c.specialty, c.position, c.phone, c.email, c.gender, c.status,
+           COALESCE(
+             (SELECT jsonb_agg(DISTINCT r.name)
+              FROM user_roles ur
+              JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+              WHERE ur.tenant_id = c.tenant_id
+                AND ur.user_id = c.user_id
+                AND r.deleted_at IS NULL),
+             '[]'
+           ) AS roles
          FROM collaborators c ${join}
          WHERE ${where}
          ORDER BY c.full_name, c.id
@@ -95,6 +117,15 @@ export class CollaboratorsRepository {
     const result = await client.query<CollaboratorDetailRow>(
       `SELECT c.id, c.full_name, c.external_id, c.specialty, c.position, c.phone, c.email, c.gender, c.status,
         COALESCE(
+          (SELECT jsonb_agg(DISTINCT r.name)
+           FROM user_roles ur
+           JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+           WHERE ur.tenant_id = c.tenant_id
+             AND ur.user_id = c.user_id
+             AND r.deleted_at IS NULL),
+          '[]'
+        ) AS roles,
+        COALESCE(
           (SELECT jsonb_agg(jsonb_build_object('clinicId', cl.id, 'clinicName', cl.name, 'roleInClinic', cc.role_in_clinic) ORDER BY cl.name)
            FROM collaborator_clinics cc JOIN clinics cl ON cl.tenant_id = cc.tenant_id AND cl.id = cc.clinic_id
            WHERE cc.tenant_id = c.tenant_id AND cc.collaborator_id = c.id AND cl.deleted_at IS NULL),
@@ -118,7 +149,8 @@ function mapSummary(row: CollaboratorRow): CollaboratorSummary {
     phone: row.phone,
     email: row.email,
     gender: row.gender,
-    status: row.status
+    status: row.status,
+    roles: row.roles ?? []
   };
 }
 function mapDetail(row: CollaboratorDetailRow): CollaboratorDetail {
