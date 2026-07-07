@@ -11,6 +11,7 @@
     "build": "tsc --noEmit",
     "db:check": "tsx src/scripts/check-db.ts",
     "admin:bootstrap": "tsx src/scripts/bootstrap-admin.ts",
+    "admin:backfill-collaborators": "tsx src/scripts/backfill-collaborators.ts",
     "platform:bootstrap-super-admin": "tsx src/scripts/bootstrap-super-admin.ts",
     "test:integration": "tsx src/scripts/test-m1-integration.ts",
     "test:outbox-integration": "tsx src/scripts/test-outbox-integration.ts",

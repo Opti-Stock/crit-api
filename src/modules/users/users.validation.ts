@@ -22,7 +22,9 @@ export const createUserSchema = z.object({
   email,
   password: z.string().min(12).max(72),
   roleIds: z.array(postgresUuid).min(1),
-  clinicAccess: z.array(clinicAccess).default([])
+  clinicAccess: z.array(clinicAccess).default([]),
+  specialty: z.string().trim().max(150).optional(),
+  position: z.string().trim().max(100).optional()
 });
 export const updateUserSchema = z
   .object({
