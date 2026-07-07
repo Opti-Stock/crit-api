@@ -90,6 +90,10 @@ export class UsersRepository {
         const userId = inserted.rows[0]!.id;
         await this.insertRoles(client, tenantId, userId, input.roleIds);
         await this.insertClinicAccess(client, tenantId, userId, input.clinicAccess);
+        await this.syncCollaboratorForUser(client, tenantId, userId, {
+          specialty: input.specialty,
+          position: input.position
+        });
         return (await this.findByIdWithClient(client, tenantId, userId))!;
       } catch (error) {
         if (isUniqueViolation(error)) throw new ConflictError("Email already exists", "EMAIL_CONFLICT");
@@ -111,12 +115,13 @@ export class UsersRepository {
              email = COALESCE($4, email),
              status = COALESCE($5, status)
            WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
-          [tenantId, userId, input.fullName ?? null, input.email ?? null, input.status ?? null]
+        [tenantId, userId, input.fullName ?? null, input.email ?? null, input.status ?? null]
         );
       } catch (error) {
         if (isUniqueViolation(error)) throw new ConflictError("Email already exists", "EMAIL_CONFLICT");
         throw error;
       }
+      await this.syncCollaboratorForUser(client, tenantId, userId);
       return (await this.findByIdWithClient(client, tenantId, userId))!;
     }, this.databasePool);
   }
@@ -129,6 +134,7 @@ export class UsersRepository {
       if (removesAdmin) await this.assertNotLastAdmin(client, tenantId, userId);
       await client.query("DELETE FROM user_roles WHERE tenant_id = $1 AND user_id = $2", [tenantId, userId]);
       await this.insertRoles(client, tenantId, userId, roleIds);
+      await this.syncCollaboratorForUser(client, tenantId, userId);
       return (await this.findByIdWithClient(client, tenantId, userId))!;
     }, this.databasePool);
   }
@@ -144,6 +150,7 @@ export class UsersRepository {
       await this.validateAssignments(client, tenantId, [], access);
       await client.query("DELETE FROM user_clinic_access WHERE tenant_id = $1 AND user_id = $2", [tenantId, userId]);
       await this.insertClinicAccess(client, tenantId, userId, access);
+      await this.syncCollaboratorForUser(client, tenantId, userId);
       return (await this.findByIdWithClient(client, tenantId, userId))!;
     }, this.databasePool);
   }
@@ -242,6 +249,91 @@ export class UsersRepository {
       await client.query(
         "INSERT INTO user_clinic_access (tenant_id, user_id, clinic_id, access_level) VALUES ($1, $2, $3, $4)",
         [tenantId, userId, item.clinicId, item.accessLevel]
+      );
+    }
+  }
+
+  private async syncCollaboratorForUser(
+    client: PoolClient,
+    tenantId: string,
+    userId: string,
+    input: { specialty?: string; position?: string } = {}
+  ) {
+    const user = await client.query<{
+      full_name: string;
+      email: string;
+      status: "active" | "inactive";
+    }>(
+      `SELECT full_name, email, status
+       FROM users
+       WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      [tenantId, userId]
+    );
+    const userRow = user.rows[0];
+    if (!userRow) return;
+
+    const roles = await client.query<{ name: string }>(
+      `SELECT r.name
+       FROM user_roles ur
+       JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+       WHERE ur.tenant_id = $1
+         AND ur.user_id = $2
+         AND r.deleted_at IS NULL
+       ORDER BY r.name`,
+      [tenantId, userId]
+    );
+    const roleNames = roles.rows.map((row) => row.name);
+    const shouldHaveCollaborator =
+      roleNames.length > 0 && roleNames.some((roleName) => roleName !== "paciente_familia");
+
+    if (!shouldHaveCollaborator) return;
+
+    const clinicalRole = roleNames.find((roleName) => roleName === "medico" || roleName === "terapeuta");
+    const fallbackSpecialty = clinicalRole ?? roleNames[0] ?? "staff";
+    const specialty = input.specialty?.trim() || fallbackSpecialty;
+    const position = input.position?.trim() || roleNames.join(", ");
+
+    const collaborator = await client.query<{ id: string }>(
+      `INSERT INTO collaborators (
+         tenant_id, user_id, full_name, email, specialty, position, status, deleted_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
+       ON CONFLICT (user_id) DO UPDATE
+       SET full_name = EXCLUDED.full_name,
+           email = EXCLUDED.email,
+           specialty = COALESCE(NULLIF(EXCLUDED.specialty, ''), collaborators.specialty),
+           position = EXCLUDED.position,
+           status = EXCLUDED.status,
+           deleted_at = NULL
+       RETURNING id`,
+      [
+        tenantId,
+        userId,
+        userRow.full_name,
+        userRow.email,
+        specialty,
+        position,
+        userRow.status
+      ]
+    );
+
+    const collaboratorId = collaborator.rows[0]!.id;
+    const clinics = await client.query<{ clinic_id: string }>(
+      `SELECT clinic_id
+       FROM user_clinic_access
+       WHERE tenant_id = $1 AND user_id = $2
+       ORDER BY clinic_id`,
+      [tenantId, userId]
+    );
+    await client.query(
+      "DELETE FROM collaborator_clinics WHERE tenant_id = $1 AND collaborator_id = $2",
+      [tenantId, collaboratorId]
+    );
+    for (const clinic of clinics.rows) {
+      await client.query(
+        `INSERT INTO collaborator_clinics (tenant_id, collaborator_id, clinic_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (tenant_id, collaborator_id, clinic_id) DO NOTHING`,
+        [tenantId, collaboratorId, clinic.clinic_id]
       );
     }
   }
