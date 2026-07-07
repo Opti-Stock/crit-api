@@ -6,7 +6,15 @@ import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import { insertNotification } from "../notifications/notifications.repository.js";
 import type { CreateHandoffNoteInput, ListHandoffNotesInput } from "./handoff-notes.validation.js";
 
-const VALID_RECIPIENT_ROLES = ["admin", "medico", "terapeuta"];
+const VALID_RECIPIENT_ROLES = [
+  "admin",
+  "direccion",
+  "recepcion",
+  "coordinador",
+  "medico",
+  "terapeuta",
+  "personal_acompanamiento"
+];
 
 export interface HandoffNoteRecipient {
   userId: string;
@@ -119,7 +127,9 @@ export class HandoffNotesRepository {
 
   async create(tenantId: string, actorId: string, input: CreateHandoffNoteInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
-      const recipientIds = [...new Set(input.recipientUserIds)];
+      const recipientIds = input.recipientUserIds.length
+        ? [...new Set(input.recipientUserIds)]
+        : await this.resolveDefaultRecipients(client, tenantId, actorId);
       await this.assertValidRecipients(client, tenantId, recipientIds);
 
       try {
@@ -215,6 +225,25 @@ export class HandoffNotesRepository {
 
   private canReadTenantWide(actorRoles: string[]) {
     return actorRoles.some((role) => role === "admin" || role === "direccion");
+  }
+
+  private async resolveDefaultRecipients(client: PoolClient, tenantId: string, actorId: string) {
+    const result = await client.query<{ id: string }>(
+      `SELECT DISTINCT u.id
+       FROM users u
+       JOIN user_roles ur ON ur.tenant_id = u.tenant_id AND ur.user_id = u.id
+       JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+       WHERE u.tenant_id = $1
+         AND u.id <> $2
+         AND u.status = 'active'
+         AND u.deleted_at IS NULL
+         AND r.name = ANY($3::varchar[])
+         AND r.deleted_at IS NULL
+       ORDER BY u.id`,
+      [tenantId, actorId, VALID_RECIPIENT_ROLES]
+    );
+
+    return result.rows.map((row) => row.id);
   }
 
   private async assertValidRecipients(client: PoolClient, tenantId: string, recipientIds: string[]) {

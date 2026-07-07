@@ -6,14 +6,16 @@ const postgresUuid = z.string().regex(
 );
 
 const noteContent = z.record(z.string(), z.unknown());
+const optionalString = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
 
 export const medicalNoteIdParamsSchema = z.object({ medicalNoteId: postgresUuid });
 
 export const listMedicalNotesSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  patientId: postgresUuid.optional(),
-  collaboratorId: postgresUuid.optional()
+  patientId: optionalString(postgresUuid),
+  collaboratorId: optionalString(postgresUuid)
 });
 
 export const createMedicalNoteSchema = z.object({
