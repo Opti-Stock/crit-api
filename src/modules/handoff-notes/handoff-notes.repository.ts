@@ -26,7 +26,7 @@ export interface HandoffNoteSummary {
   id: string;
   patient: { id: string; fullName: string };
   appointmentId: string | null;
-  createdBy: { id: string; fullName: string };
+  createdBy: { id: string; fullName: string; role: string | null; area: string | null };
   title: string;
   content: string;
   priority: string;
@@ -42,6 +42,8 @@ interface HandoffNoteRow {
   appointment_id: string | null;
   created_by_user_id: string;
   created_by_full_name: string;
+  created_by_role: string | null;
+  created_by_area: string | null;
   title: string;
   content: string;
   priority: string;
@@ -53,6 +55,7 @@ interface HandoffNoteRow {
 const SELECT_HANDOFF_NOTE = `
   SELECT hn.id, hn.patient_id, p.full_name AS patient_full_name, hn.appointment_id,
     hn.created_by_user_id, creator.full_name AS created_by_full_name,
+    creator_role.name AS created_by_role, creator_collaborator.specialty AS created_by_area,
     hn.title, hn.content, hn.priority, hn.status, hn.created_at,
     COALESCE(
       (SELECT jsonb_agg(jsonb_build_object('userId', u.id, 'fullName', u.full_name, 'readAt', hnr.read_at) ORDER BY u.full_name)
@@ -63,6 +66,29 @@ const SELECT_HANDOFF_NOTE = `
   FROM handoff_notes hn
   JOIN patients p ON p.tenant_id = hn.tenant_id AND p.id = hn.patient_id
   JOIN users creator ON creator.tenant_id = hn.tenant_id AND creator.id = hn.created_by_user_id
+  LEFT JOIN LATERAL (
+    SELECT r.name
+    FROM user_roles ur
+    JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+    WHERE ur.tenant_id = creator.tenant_id
+      AND ur.user_id = creator.id
+      AND r.deleted_at IS NULL
+    ORDER BY CASE r.name
+      WHEN 'admin' THEN 1
+      WHEN 'direccion' THEN 2
+      WHEN 'recepcion' THEN 3
+      WHEN 'coordinador' THEN 4
+      WHEN 'medico' THEN 5
+      WHEN 'terapeuta' THEN 6
+      WHEN 'personal_acompanamiento' THEN 7
+      ELSE 99
+    END
+    LIMIT 1
+  ) creator_role ON TRUE
+  LEFT JOIN collaborators creator_collaborator
+    ON creator_collaborator.tenant_id = creator.tenant_id
+   AND creator_collaborator.user_id = creator.id
+   AND creator_collaborator.deleted_at IS NULL
 `;
 
 function visibilityClause(actorParam: string): string {
@@ -94,6 +120,10 @@ export class HandoffNotesRepository {
       if (input.priority) {
         values.push(input.priority);
         filters.push(`hn.priority = $${values.length}`);
+      }
+      if (input.patientId) {
+        values.push(input.patientId);
+        filters.push(`hn.patient_id = $${values.length}`);
       }
 
       const where = filters.join(" AND ");
@@ -131,6 +161,7 @@ export class HandoffNotesRepository {
         ? [...new Set(input.recipientUserIds)]
         : await this.resolveDefaultRecipients(client, tenantId, actorId);
       await this.assertValidRecipients(client, tenantId, recipientIds);
+      const patientName = await this.resolvePatientName(client, tenantId, input.patientId);
 
       try {
         const inserted = await client.query<{ id: string }>(
@@ -156,13 +187,23 @@ export class HandoffNotesRepository {
           [tenantId, handoffNoteId, recipientIds]
         );
 
-        for (const recipientId of recipientIds) {
+        for (const recipientId of recipientIds.filter((recipientId) => recipientId !== actorId)) {
           await insertNotification(client, {
             tenantId,
             userId: recipientId,
             type: "handoff_note_received",
             title: "Nueva nota de enlace",
-            message: input.title
+            message: input.title,
+            metadata: {
+              target: {
+                type: "handoff_note",
+                entityId: handoffNoteId,
+                handoffNoteId,
+                patientId: input.patientId
+              },
+              patient: { id: input.patientId, fullName: patientName },
+              handoffNote: { id: handoffNoteId }
+            }
           });
         }
 
@@ -263,6 +304,14 @@ export class HandoffNotesRepository {
       );
     }
   }
+
+  private async resolvePatientName(client: PoolClient, tenantId: string, patientId: string) {
+    const result = await client.query<{ full_name: string }>(
+      `SELECT full_name FROM patients WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      [tenantId, patientId]
+    );
+    return result.rows[0]?.full_name ?? null;
+  }
 }
 
 function mapSummary(row: HandoffNoteRow): HandoffNoteSummary {
@@ -270,7 +319,12 @@ function mapSummary(row: HandoffNoteRow): HandoffNoteSummary {
     id: row.id,
     patient: { id: row.patient_id, fullName: row.patient_full_name },
     appointmentId: row.appointment_id,
-    createdBy: { id: row.created_by_user_id, fullName: row.created_by_full_name },
+    createdBy: {
+      id: row.created_by_user_id,
+      fullName: row.created_by_full_name,
+      role: row.created_by_role,
+      area: row.created_by_area
+    },
     title: row.title,
     content: row.content,
     priority: row.priority,

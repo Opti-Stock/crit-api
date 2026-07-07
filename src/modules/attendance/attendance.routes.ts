@@ -22,6 +22,6 @@ attendanceRouter.get("/:attendanceId", controller.get);
 attendanceRouter.post("/", requireRoles("medico", "terapeuta"), controller.create);
 attendanceRouter.patch(
   "/:attendanceId",
-  requireRoles("admin", "direccion", "medico", "terapeuta"),
+  requireRoles("medico", "terapeuta"),
   controller.update
 );

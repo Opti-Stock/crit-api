@@ -12,7 +12,7 @@ export const checkinRouter = Router();
 checkinRouter.use(
   authenticateRequest,
   requireTenantContext,
-  requireRoles("admin", "direccion", "recepcion")
+  requireRoles("admin", "direccion", "recepcion", "medico")
 );
 
 checkinRouter.get("/appointments", controller.listAppointments);

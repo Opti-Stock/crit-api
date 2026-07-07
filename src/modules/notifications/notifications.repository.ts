@@ -10,6 +10,14 @@ export interface NotificationSummary {
   type: string;
   title: string;
   message: string;
+  target: {
+    type?: string;
+    patientId?: string;
+    handoffNoteId?: string;
+    noteId?: string;
+    entityId?: string;
+  } | null;
+  metadata: Record<string, unknown> | null;
   readAt: string | null;
   createdAt: string;
 }
@@ -19,6 +27,7 @@ interface NotificationRow {
   type: string;
   title: string;
   message: string;
+  metadata: Record<string, unknown> | null;
   read_at: string | null;
   created_at: string;
 }
@@ -30,12 +39,26 @@ interface NotificationRow {
  */
 export async function insertNotification(
   client: PoolClient,
-  params: { tenantId: string; userId: string; type: string; title: string; message: string }
+  params: {
+    tenantId: string;
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    metadata?: Record<string, unknown>;
+  }
 ): Promise<void> {
   await client.query(
-    `INSERT INTO notifications (tenant_id, user_id, type, title, message)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [params.tenantId, params.userId, params.type, params.title, params.message]
+    `INSERT INTO notifications (tenant_id, user_id, type, title, message, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      params.tenantId,
+      params.userId,
+      params.type,
+      params.title,
+      params.message,
+      params.metadata ?? {}
+    ]
   );
 }
 
@@ -58,7 +81,7 @@ export class NotificationsRepository {
 
       values.push(input.pageSize, (input.page - 1) * input.pageSize);
       const rows = await client.query<NotificationRow>(
-        `SELECT id, type, title, message, read_at, created_at
+        `SELECT id, type, title, message, metadata, read_at, created_at
          FROM notifications
          WHERE ${where}
          ORDER BY created_at DESC
@@ -83,10 +106,10 @@ export class NotificationsRepository {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       try {
         const inserted = await client.query<{ id: string }>(
-          `INSERT INTO notifications (tenant_id, user_id, type, title, message)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO notifications (tenant_id, user_id, type, title, message, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id`,
-          [tenantId, input.userId, input.type, input.title, input.message]
+          [tenantId, input.userId, input.type, input.title, input.message, input.metadata ?? {}]
         );
         return (await this.findByIdWithClient(client, tenantId, input.userId, inserted.rows[0]!.id))!;
       } catch (error) {
@@ -114,7 +137,7 @@ export class NotificationsRepository {
     notificationId: string
   ) {
     const result = await client.query<NotificationRow>(
-      `SELECT id, type, title, message, read_at, created_at
+      `SELECT id, type, title, message, metadata, read_at, created_at
        FROM notifications
        WHERE tenant_id = $1 AND id = $2 AND user_id = $3`,
       [tenantId, notificationId, actorId]
@@ -129,9 +152,17 @@ function mapSummary(row: NotificationRow): NotificationSummary {
     type: row.type,
     title: row.title,
     message: row.message,
+    target: readObject(row.metadata?.target),
+    metadata: row.metadata ?? null,
     readAt: row.read_at,
     createdAt: row.created_at
   };
+}
+
+function readObject(value: unknown): Record<string, string> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, string>)
+    : null;
 }
 
 function mapDatabaseError(error: unknown): Error {

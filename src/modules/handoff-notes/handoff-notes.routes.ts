@@ -15,5 +15,9 @@ handoffNotesRouter.use(
 );
 handoffNotesRouter.get("/", controller.list);
 handoffNotesRouter.get("/:handoffNoteId", controller.get);
-handoffNotesRouter.post("/", controller.create);
+handoffNotesRouter.post(
+  "/",
+  requireRoles("recepcion", "coordinador", "medico", "terapeuta", "personal_acompanamiento"),
+  controller.create
+);
 handoffNotesRouter.patch("/:handoffNoteId/read", controller.markAsRead);
