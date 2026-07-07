@@ -59,12 +59,23 @@ export class MedicalNotesRepository {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const filters = ["mn.tenant_id = $1", "mn.deleted_at IS NULL"];
       const values: unknown[] = [tenantId];
+      const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+
+      if (!ownCollaboratorId) {
+        return { notes: [], total: 0 };
+      }
+
+      values.push(ownCollaboratorId);
+      filters.push(`mn.collaborator_id = $${values.length}`);
 
       if (input.patientId) {
         values.push(input.patientId);
         filters.push(`mn.patient_id = $${values.length}`);
       }
       if (input.collaboratorId) {
+        if (input.collaboratorId !== ownCollaboratorId) {
+          return { notes: [], total: 0 };
+        }
         values.push(input.collaboratorId);
         filters.push(`mn.collaborator_id = $${values.length}`);
       }
@@ -93,8 +104,13 @@ export class MedicalNotesRepository {
     actorId: string,
     medicalNoteId: string
   ): Promise<MedicalNoteSummary | null> {
-    return withTenantTransaction({ tenantId, userId: actorId }, (client) =>
-      this.findByIdWithClient(client, tenantId, medicalNoteId), this.databasePool);
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const note = await this.findByIdWithClient(client, tenantId, medicalNoteId);
+      if (!note) return null;
+
+      const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      return ownCollaboratorId === note.collaborator.id ? note : null;
+    }, this.databasePool);
   }
 
   async create(tenantId: string, actorId: string, input: CreateMedicalNoteInput) {

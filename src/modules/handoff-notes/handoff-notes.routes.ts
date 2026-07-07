@@ -11,7 +11,7 @@ export const handoffNotesRouter = Router();
 handoffNotesRouter.use(
   authenticateRequest,
   requireTenantContext,
-  requireRoles("admin", "medico", "terapeuta", "personal_acompanamiento")
+  requireRoles("admin", "direccion", "recepcion", "coordinador", "medico", "terapeuta", "personal_acompanamiento")
 );
 handoffNotesRouter.get("/", controller.list);
 handoffNotesRouter.get("/:handoffNoteId", controller.get);

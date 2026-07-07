@@ -23,7 +23,7 @@ export const createHandoffNoteSchema = z.object({
   title: z.string().trim().min(1).max(200),
   content: z.string().trim().min(1),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
-  recipientUserIds: z.array(postgresUuid).min(1)
+  recipientUserIds: z.array(postgresUuid).default([])
 });
 
 export type ListHandoffNotesInput = z.output<typeof listHandoffNotesSchema>;
