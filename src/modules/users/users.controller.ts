@@ -52,6 +52,11 @@ export class UsersController {
     response.status(204).send();
   };
 
+  readonly restore: RequestHandler = async (request, response) => {
+    const { userId } = parseWithSchema(userIdParamsSchema, request.params);
+    sendSuccess(response, await this.service.restore(request.auth!, userId));
+  };
+
   readonly replaceRoles: RequestHandler = async (request, response) => {
     const { userId } = parseWithSchema(userIdParamsSchema, request.params);
     const { roleIds } = parseWithSchema(replaceRolesSchema, request.body);

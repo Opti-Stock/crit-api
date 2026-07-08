@@ -15,7 +15,8 @@ export const listUsersSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().max(255).optional(),
-  status: z.enum(["active", "inactive"]).optional()
+  status: z.enum(["active", "inactive"]).optional(),
+  includeDeleted: z.coerce.boolean().default(false)
 });
 export const createUserSchema = z.object({
   fullName: z.string().trim().min(1).max(255),

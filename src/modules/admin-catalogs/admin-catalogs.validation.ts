@@ -16,6 +16,15 @@ const positiveInt = z.coerce.number().int().positive();
 const nonNegativeInt = z.coerce.number().int().min(0);
 
 export const idParamsSchema = z.object({ id: postgresUuid });
+export const listAdminCatalogsSchema = z.object({
+  includeDeleted: z.coerce.boolean().default(false)
+});
+export const listAuditLogsSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  entityType: z.string().trim().max(100).optional(),
+  entityId: postgresUuid.optional()
+});
 
 export const createClinicSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -69,6 +78,8 @@ export const updateCollaboratorSchema = createCollaboratorSchema
   .strict();
 
 export type CreateClinicInput = z.output<typeof createClinicSchema>;
+export type ListAdminCatalogsInput = z.output<typeof listAdminCatalogsSchema>;
+export type ListAuditLogsInput = z.output<typeof listAuditLogsSchema>;
 export type UpdateClinicInput = z.output<typeof updateClinicSchema>;
 export type CreatePatientInput = z.output<typeof createPatientSchema>;
 export type UpdatePatientInput = z.output<typeof updatePatientSchema>;

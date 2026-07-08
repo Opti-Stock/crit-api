@@ -1,12 +1,77 @@
 services:
-  crit-api:
+  main-api:
     build: .
-    container_name: crit-api
-    ports:
-      - "3000:3000"
-      - "3001:3001"
+    image: crit-api:local
+    command: ["node", "dist/apps/main-api/server.js"]
     env_file:
       - .env
-    volumes:
-      - .:/app
-      - /app/node_modules
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql://crit_app:crit_app@host.docker.internal:5432/crit_db}
+      PLATFORM_DATABASE_URL: ${API_PLATFORM_DATABASE_URL:-postgresql://crit_platform_app:crit_platform_app@host.docker.internal:5432/crit_db}
+      MAIN_API_PORT: 3000
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  admin-api:
+    image: crit-api:local
+    command: ["node", "dist/apps/admin-api/server.js"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql://crit_app:crit_app@host.docker.internal:5432/crit_db}
+      PLATFORM_DATABASE_URL: ${API_PLATFORM_DATABASE_URL:-postgresql://crit_platform_app:crit_platform_app@host.docker.internal:5432/crit_db}
+      ADMIN_API_PORT: 3001
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  checkin-api:
+    image: crit-api:local
+    command: ["node", "dist/apps/checkin-api/server.js"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql://crit_app:crit_app@host.docker.internal:5432/crit_db}
+      PLATFORM_DATABASE_URL: ${API_PLATFORM_DATABASE_URL:-postgresql://crit_platform_app:crit_platform_app@host.docker.internal:5432/crit_db}
+      CHECKIN_API_PORT: 3002
+    ports:
+      - "3002:3002"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  super-admin-api:
+    image: crit-api:local
+    command: ["node", "dist/apps/super-admin-api/server.js"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql://crit_app:crit_app@host.docker.internal:5432/crit_db}
+      PLATFORM_DATABASE_URL: ${API_PLATFORM_DATABASE_URL:-postgresql://crit_platform_app:crit_platform_app@host.docker.internal:5432/crit_db}
+      SUPER_ADMIN_API_PORT: 3003
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

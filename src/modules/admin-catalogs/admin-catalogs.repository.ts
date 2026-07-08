@@ -9,6 +9,8 @@ import type {
   CreateCollaboratorInput,
   CreatePatientInput,
   CreateRoomInput,
+  ListAdminCatalogsInput,
+  ListAuditLogsInput,
   UpdateAppointmentTypeInput,
   UpdateClinicInput,
   UpdateCollaboratorInput,
@@ -19,12 +21,12 @@ import type {
 export class AdminCatalogsRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  listClinics(tenantId: string, actorId: string) {
+  listClinics(tenantId: string, actorId: string, input: ListAdminCatalogsInput = { includeDeleted: false }) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
-        `SELECT id, name, specialization, capacity, coordinator_id AS "coordinatorId", status
+        `SELECT id, name, specialization, capacity, coordinator_id AS "coordinatorId", status, deleted_at AS "deletedAt"
          FROM clinics
-         WHERE tenant_id = $1 AND deleted_at IS NULL
+         WHERE tenant_id = $1 ${input.includeDeleted ? "" : "AND deleted_at IS NULL"}
          ORDER BY name`,
         [tenantId]
       );
@@ -88,6 +90,20 @@ export class AdminCatalogsRepository {
          WHERE tenant_id = $1 AND clinic_id = $2 AND deleted_at IS NULL`,
         [tenantId, id]
       );
+    }, this.databasePool);
+  }
+
+  restoreClinic(tenantId: string, actorId: string, id: string) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const result = await client.query(
+        `UPDATE clinics
+         SET status = 'active',
+             deleted_at = NULL
+         WHERE tenant_id = $1 AND id = $2
+         RETURNING id, name, specialization, capacity, coordinator_id AS "coordinatorId", status, deleted_at AS "deletedAt"`,
+        [tenantId, id]
+      );
+      return requireRow(result.rows[0], "Clinic not found", "CLINIC_NOT_FOUND");
     }, this.databasePool);
   }
 
@@ -158,13 +174,13 @@ export class AdminCatalogsRepository {
     }, this.databasePool);
   }
 
-  listRooms(tenantId: string, actorId: string) {
+  listRooms(tenantId: string, actorId: string, input: ListAdminCatalogsInput = { includeDeleted: false }) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
-        `SELECT r.id, r.clinic_id AS "clinicId", c.name AS "clinicName", r.name, r.capacity, r.status
+        `SELECT r.id, r.clinic_id AS "clinicId", c.name AS "clinicName", r.name, r.capacity, r.status, r.deleted_at AS "deletedAt"
          FROM rooms r
-         JOIN clinics c ON c.tenant_id = r.tenant_id AND c.id = r.clinic_id AND c.deleted_at IS NULL
-         WHERE r.tenant_id = $1 AND r.deleted_at IS NULL
+         JOIN clinics c ON c.tenant_id = r.tenant_id AND c.id = r.clinic_id
+         WHERE r.tenant_id = $1 ${input.includeDeleted ? "" : "AND r.deleted_at IS NULL AND c.deleted_at IS NULL"}
          ORDER BY c.name, r.name`,
         [tenantId]
       );
@@ -219,6 +235,27 @@ export class AdminCatalogsRepository {
         [tenantId, id]
       );
       requireRow(result.rows[0], "Room not found", "ROOM_NOT_FOUND");
+    }, this.databasePool);
+  }
+
+  restoreRoom(tenantId: string, actorId: string, id: string) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const result = await client.query(
+        `UPDATE rooms
+         SET status = 'active',
+             deleted_at = NULL
+         WHERE tenant_id = $1
+           AND id = $2
+           AND EXISTS (
+             SELECT 1 FROM clinics
+             WHERE clinics.tenant_id = rooms.tenant_id
+               AND clinics.id = rooms.clinic_id
+               AND clinics.deleted_at IS NULL
+           )
+         RETURNING id, clinic_id AS "clinicId", name, capacity, status, deleted_at AS "deletedAt"`,
+        [tenantId, id]
+      );
+      return requireRow(result.rows[0], "Room not found or clinic is deleted", "ROOM_NOT_RESTORABLE");
     }, this.databasePool);
   }
 
@@ -378,6 +415,48 @@ export class AdminCatalogsRepository {
       } catch (error) {
         throw mapCatalogError(error);
       }
+    }, this.databasePool);
+  }
+
+  listAuditLogs(tenantId: string, actorId: string, input: ListAuditLogsInput) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const filters = ["al.tenant_id = $1"];
+      const values: unknown[] = [tenantId];
+
+      if (input.entityType) {
+        values.push(input.entityType);
+        filters.push(`al.entity_type = $${values.length}`);
+      }
+      if (input.entityId) {
+        values.push(input.entityId);
+        filters.push(`al.entity_id = $${values.length}`);
+      }
+
+      const where = filters.join(" AND ");
+      const count = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM audit_logs al WHERE ${where}`,
+        values
+      );
+
+      values.push(input.pageSize, (input.page - 1) * input.pageSize);
+      const logs = await client.query(
+        `SELECT al.id,
+                al.action,
+                al.entity_type AS "entityType",
+                al.entity_id AS "entityId",
+                al.metadata,
+                al.created_at AS "createdAt",
+                u.full_name AS "actorName",
+                u.email AS "actorEmail"
+         FROM audit_logs al
+         LEFT JOIN users u ON u.tenant_id = al.tenant_id AND u.id = al.user_id
+         WHERE ${where}
+         ORDER BY al.created_at DESC
+         LIMIT $${values.length - 1} OFFSET $${values.length}`,
+        values
+      );
+
+      return { logs: logs.rows, total: Number(count.rows[0]?.count ?? 0) };
     }, this.databasePool);
   }
 

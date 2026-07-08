@@ -16,6 +16,7 @@ export interface UserSummary {
   email: string;
   status: "active" | "inactive";
   roles: { id: string; name: string }[];
+  deletedAt: string | null;
 }
 
 export interface UserDetail extends UserSummary {
@@ -29,6 +30,7 @@ interface UserRow {
   email: string;
   status: "active" | "inactive";
   last_login_at: string | null;
+  deleted_at: string | null;
   roles: UserSummary["roles"];
   clinic_access: UserDetail["clinicAccess"];
 }
@@ -38,8 +40,9 @@ export class UsersRepository {
 
   async list(tenantId: string, actorId: string, input: ListUsersInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
-      const filters = ["u.tenant_id = $1", "u.deleted_at IS NULL"];
+      const filters = ["u.tenant_id = $1"];
       const values: unknown[] = [tenantId];
+      if (!input.includeDeleted) filters.push("u.deleted_at IS NULL");
       if (input.search) {
         values.push(`%${input.search}%`);
         filters.push(`(u.full_name ILIKE $${values.length} OR u.email ILIKE $${values.length})`);
@@ -55,7 +58,7 @@ export class UsersRepository {
       );
       values.push(input.pageSize, (input.page - 1) * input.pageSize);
       const rows = await client.query<UserRow>(
-        `SELECT u.id, u.full_name, u.email, u.status, u.last_login_at,
+        `SELECT u.id, u.full_name, u.email, u.status, u.last_login_at, u.deleted_at,
           COALESCE((SELECT jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name) ORDER BY r.name)
             FROM user_roles ur JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
             WHERE ur.tenant_id = u.tenant_id AND ur.user_id = u.id AND r.deleted_at IS NULL), '[]') AS roles,
@@ -151,6 +154,22 @@ export class UsersRepository {
     }, this.databasePool);
   }
 
+  async restore(tenantId: string, actorId: string, userId: string) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const result = await client.query(
+        `UPDATE users
+         SET status = 'active',
+             deleted_at = NULL
+         WHERE tenant_id = $1 AND id = $2
+         RETURNING id`,
+        [tenantId, userId]
+      );
+      if ((result.rowCount ?? 0) === 0) throw new NotFoundError("User not found", "USER_NOT_FOUND");
+      await this.syncCollaboratorForUser(client, tenantId, userId);
+      return (await this.findByIdWithClient(client, tenantId, userId, true))!;
+    }, this.databasePool);
+  }
+
   async replaceRoles(tenantId: string, actorId: string, userId: string, roleIds: string[]) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       await this.requireUser(client, tenantId, userId);
@@ -191,16 +210,24 @@ export class UsersRepository {
     }, this.databasePool);
   }
 
-  private async findByIdWithClient(client: PoolClient, tenantId: string, userId: string) {
+  private async findByIdWithClient(
+    client: PoolClient,
+    tenantId: string,
+    userId: string,
+    includeDeleted = false
+  ) {
     const result = await client.query<UserRow>(
-      `SELECT u.id, u.full_name, u.email, u.status, u.last_login_at,
+      `SELECT u.id, u.full_name, u.email, u.status, u.last_login_at, u.deleted_at,
         COALESCE((SELECT jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name) ORDER BY r.name)
           FROM user_roles ur JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
           WHERE ur.tenant_id = u.tenant_id AND ur.user_id = u.id AND r.deleted_at IS NULL), '[]') AS roles,
         COALESCE((SELECT jsonb_agg(jsonb_build_object('clinicId', c.id, 'clinicName', c.name, 'accessLevel', uca.access_level) ORDER BY c.name)
           FROM user_clinic_access uca JOIN clinics c ON c.tenant_id = uca.tenant_id AND c.id = uca.clinic_id
           WHERE uca.tenant_id = u.tenant_id AND uca.user_id = u.id AND c.deleted_at IS NULL), '[]') AS clinic_access
-       FROM users u WHERE u.tenant_id = $1 AND u.id = $2 AND u.deleted_at IS NULL`,
+       FROM users u
+       WHERE u.tenant_id = $1
+         AND u.id = $2
+         ${includeDeleted ? "" : "AND u.deleted_at IS NULL"}`,
       [tenantId, userId]
     );
     return result.rows[0] ? mapDetail(result.rows[0]) : null;
@@ -365,7 +392,14 @@ export class UsersRepository {
 }
 
 function mapSummary(row: UserRow): UserSummary {
-  return { id: row.id, fullName: row.full_name, email: row.email, status: row.status, roles: row.roles };
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    status: row.status,
+    roles: row.roles,
+    deletedAt: row.deleted_at
+  };
 }
 function mapDetail(row: UserRow): UserDetail {
   return { ...mapSummary(row), clinicAccess: row.clinic_access, lastLoginAt: row.last_login_at };
