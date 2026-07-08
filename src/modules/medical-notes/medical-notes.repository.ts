@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
+import type { OperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import type { CreateMedicalNoteInput, ListMedicalNotesInput, UpdateMedicalNoteInput } from "./medical-notes.validation.js";
@@ -55,24 +56,25 @@ const SELECT_MEDICAL_NOTE = `
 export class MedicalNotesRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  async list(tenantId: string, actorId: string, actorRoles: string[], input: ListMedicalNotesInput) {
+  async list(
+    tenantId: string,
+    actorId: string,
+    actorRoles: string[],
+    input: ListMedicalNotesInput,
+    scope: OperationalAccessScope
+  ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const filters = ["mn.tenant_id = $1", "mn.deleted_at IS NULL"];
       const values: unknown[] = [tenantId];
       const canReadTenantWide = actorRoles.some((role) =>
-        role === "admin" || role === "direccion" || role === "coordinador"
+        role === "admin" || role === "direccion"
       );
-      const ownCollaboratorId = canReadTenantWide
-        ? null
-        : await this.resolveOwnCollaboratorId(client, tenantId, actorId);
 
       if (!canReadTenantWide) {
-        if (!ownCollaboratorId) {
+        const hasAccess = await this.appendAccessFilter(client, tenantId, actorId, scope, values, filters);
+        if (!hasAccess) {
           return { notes: [], total: 0 };
         }
-
-        values.push(ownCollaboratorId);
-        filters.push(`mn.collaborator_id = $${values.length}`);
       }
 
       if (input.patientId) {
@@ -80,9 +82,6 @@ export class MedicalNotesRepository {
         filters.push(`mn.patient_id = $${values.length}`);
       }
       if (input.collaboratorId) {
-        if (!canReadTenantWide && input.collaboratorId !== ownCollaboratorId) {
-          return { notes: [], total: 0 };
-        }
         values.push(input.collaboratorId);
         filters.push(`mn.collaborator_id = $${values.length}`);
       }
@@ -110,18 +109,18 @@ export class MedicalNotesRepository {
     tenantId: string,
     actorId: string,
     actorRoles: string[],
-    medicalNoteId: string
+    medicalNoteId: string,
+    scope: OperationalAccessScope
   ): Promise<MedicalNoteSummary | null> {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const note = await this.findByIdWithClient(client, tenantId, medicalNoteId);
       if (!note) return null;
 
-      if (actorRoles.some((role) => role === "admin" || role === "direccion" || role === "coordinador")) {
+      if (actorRoles.some((role) => role === "admin" || role === "direccion")) {
         return note;
       }
 
-      const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
-      return ownCollaboratorId === note.collaborator.id ? note : null;
+      return (await this.canAccessNote(client, tenantId, actorId, scope, note)) ? note : null;
     }, this.databasePool);
   }
 
@@ -224,6 +223,73 @@ export class MedicalNotesRepository {
       [tenantId, userId]
     );
     return result.rows[0]?.id ?? null;
+  }
+
+  private async appendAccessFilter(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    scope: OperationalAccessScope,
+    values: unknown[],
+    filters: string[]
+  ): Promise<boolean> {
+    const accessClauses: string[] = [];
+    if (scope.clinics) {
+      const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
+      if (clinicIds.length > 0) {
+        values.push(clinicIds);
+        accessClauses.push(`EXISTS (
+          SELECT 1 FROM appointments a
+          WHERE a.tenant_id = mn.tenant_id
+            AND a.id = mn.appointment_id
+            AND a.clinic_id = ANY($${values.length}::uuid[])
+            AND a.deleted_at IS NULL
+        )`);
+      }
+    }
+    if (scope.ownCollaborator) {
+      const collaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      if (collaboratorId) {
+        values.push(collaboratorId);
+        accessClauses.push(`mn.collaborator_id = $${values.length}`);
+      }
+    }
+    if (accessClauses.length === 0) return false;
+    filters.push(`(${accessClauses.join(" OR ")})`);
+    return true;
+  }
+
+  private async canAccessNote(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    scope: OperationalAccessScope,
+    note: MedicalNoteSummary
+  ) {
+    if (scope.ownCollaborator) {
+      const ownCollaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      if (ownCollaboratorId && ownCollaboratorId === note.collaborator.id) return true;
+    }
+    if (!scope.clinics) return false;
+    const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
+    if (clinicIds.length === 0) return false;
+    const result = await client.query(
+      `SELECT 1 FROM appointments
+       WHERE tenant_id = $1
+         AND id = $2
+         AND clinic_id = ANY($3::uuid[])
+         AND deleted_at IS NULL`,
+      [tenantId, note.appointmentId, clinicIds]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  private async resolveAccessibleClinicIds(client: PoolClient, tenantId: string, userId: string) {
+    const result = await client.query<{ clinic_id: string }>(
+      `SELECT clinic_id FROM user_clinic_access WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, userId]
+    );
+    return result.rows.map((row) => row.clinic_id);
   }
 }
 

@@ -1,4 +1,5 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
+import { resolveOperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import { MedicalNotesRepository } from "./medical-notes.repository.js";
 import type { CreateMedicalNoteInput, ListMedicalNotesInput, UpdateMedicalNoteInput } from "./medical-notes.validation.js";
 
@@ -6,11 +7,23 @@ export class MedicalNotesService {
   constructor(private readonly repository = new MedicalNotesRepository()) {}
 
   list(context: AuthenticatedRequestContext, input: ListMedicalNotesInput) {
-    return this.repository.list(context.tenantId, context.userId, context.roles, input);
+    return this.repository.list(
+      context.tenantId,
+      context.userId,
+      context.roles,
+      input,
+      resolveOperationalAccessScope(context.roles)
+    );
   }
 
   get(context: AuthenticatedRequestContext, medicalNoteId: string) {
-    return this.repository.findById(context.tenantId, context.userId, context.roles, medicalNoteId);
+    return this.repository.findById(
+      context.tenantId,
+      context.userId,
+      context.roles,
+      medicalNoteId,
+      resolveOperationalAccessScope(context.roles)
+    );
   }
 
   create(context: AuthenticatedRequestContext, input: CreateMedicalNoteInput) {

@@ -6,7 +6,7 @@ export interface OperationalAccessScope {
 
 const TENANT_WIDE_ROLES = new Set(["admin", "direccion"]);
 const CLINIC_SCOPED_ROLES = new Set(["recepcion", "coordinador"]);
-const OWN_COLLABORATOR_ROLES = new Set(["medico", "terapeuta"]);
+const OWN_COLLABORATOR_ROLES = new Set(["coordinador", "medico", "terapeuta"]);
 
 export function resolveOperationalAccessScope(roles: readonly string[]): OperationalAccessScope {
   const tenantWide = roles.some((role) => TENANT_WIDE_ROLES.has(role));

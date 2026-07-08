@@ -23,7 +23,7 @@ test("single roles retain their expected scope", () => {
   assert.deepEqual(resolveOperationalAccessScope(["coordinador"]), {
     tenantWide: false,
     clinics: true,
-    ownCollaborator: false
+    ownCollaborator: true
   });
   assert.deepEqual(resolveOperationalAccessScope(["medico"]), {
     tenantWide: false,
