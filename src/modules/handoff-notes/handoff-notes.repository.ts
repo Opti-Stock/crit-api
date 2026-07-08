@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
+import type { OperationalAccessScope } from "../../shared/access/operational-access-scope.js";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import { insertNotification } from "../notifications/notifications.repository.js";
@@ -91,26 +92,24 @@ const SELECT_HANDOFF_NOTE = `
    AND creator_collaborator.deleted_at IS NULL
 `;
 
-function visibilityClause(actorParam: string): string {
-  return `
-    (hn.created_by_user_id = ${actorParam}
-     OR EXISTS (
-       SELECT 1 FROM handoff_note_recipients hnr
-       WHERE hnr.tenant_id = hn.tenant_id AND hnr.handoff_note_id = hn.id AND hnr.user_id = ${actorParam}
-     ))
-  `;
-}
-
 export class HandoffNotesRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  async list(tenantId: string, actorId: string, actorRoles: string[], input: ListHandoffNotesInput) {
+  async list(
+    tenantId: string,
+    actorId: string,
+    actorRoles: string[],
+    input: ListHandoffNotesInput,
+    scope: OperationalAccessScope
+  ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const filters = ["hn.tenant_id = $1", "hn.deleted_at IS NULL"];
       const values: unknown[] = [tenantId];
       if (!this.canReadTenantWide(actorRoles)) {
-        values.push(actorId);
-        filters.push(visibilityClause(`$${values.length}`));
+        const hasAccess = await this.appendVisibilityFilter(client, tenantId, actorId, scope, values, filters);
+        if (!hasAccess) {
+          return { notes: [], total: 0 };
+        }
       }
 
       if (input.status) {
@@ -149,10 +148,11 @@ export class HandoffNotesRepository {
     tenantId: string,
     actorId: string,
     actorRoles: string[],
-    handoffNoteId: string
+    handoffNoteId: string,
+    scope: OperationalAccessScope
   ): Promise<HandoffNoteSummary | null> {
     return withTenantTransaction({ tenantId, userId: actorId }, (client) =>
-      this.findByIdWithClient(client, tenantId, actorId, actorRoles, handoffNoteId), this.databasePool);
+      this.findByIdWithClient(client, tenantId, actorId, actorRoles, handoffNoteId, scope), this.databasePool);
   }
 
   async create(tenantId: string, actorId: string, input: CreateHandoffNoteInput) {
@@ -207,7 +207,11 @@ export class HandoffNotesRepository {
           });
         }
 
-        return (await this.findByIdWithClient(client, tenantId, actorId, [], handoffNoteId))!;
+        return (await this.findByIdWithClient(client, tenantId, actorId, [], handoffNoteId, {
+          tenantWide: false,
+          clinics: false,
+          ownCollaborator: false
+        }))!;
       } catch (error) {
         throw mapDatabaseError(error);
       }
@@ -241,7 +245,11 @@ export class HandoffNotesRepository {
         [tenantId, handoffNoteId]
       );
 
-      return (await this.findByIdWithClient(client, tenantId, actorId, [], handoffNoteId))!;
+      return (await this.findByIdWithClient(client, tenantId, actorId, [], handoffNoteId, {
+        tenantWide: false,
+        clinics: false,
+        ownCollaborator: false
+      }))!;
     }, this.databasePool);
   }
 
@@ -250,15 +258,18 @@ export class HandoffNotesRepository {
     tenantId: string,
     actorId: string,
     actorRoles: string[],
-    handoffNoteId: string
+    handoffNoteId: string,
+    scope: OperationalAccessScope
   ) {
     const values: unknown[] = [tenantId, handoffNoteId];
-    const visibility = this.canReadTenantWide(actorRoles)
-      ? "TRUE"
-      : visibilityClause(`$${values.push(actorId)}`);
+    const filters = ["hn.tenant_id = $1", "hn.id = $2", "hn.deleted_at IS NULL"];
+    if (!this.canReadTenantWide(actorRoles)) {
+      const hasAccess = await this.appendVisibilityFilter(client, tenantId, actorId, scope, values, filters);
+      if (!hasAccess) return null;
+    }
     const result = await client.query<HandoffNoteRow>(
       `${SELECT_HANDOFF_NOTE}
-       WHERE hn.tenant_id = $1 AND hn.id = $2 AND hn.deleted_at IS NULL AND ${visibility}`,
+       WHERE ${filters.join(" AND ")}`,
       values
     );
     return result.rows[0] ? mapSummary(result.rows[0]) : null;
@@ -266,6 +277,61 @@ export class HandoffNotesRepository {
 
   private canReadTenantWide(actorRoles: string[]) {
     return actorRoles.some((role) => role === "admin" || role === "direccion");
+  }
+
+  private async appendVisibilityFilter(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    scope: OperationalAccessScope,
+    values: unknown[],
+    filters: string[]
+  ): Promise<boolean> {
+    const clauses: string[] = [];
+
+    values.push(actorId);
+    const actorParam = `$${values.length}`;
+    clauses.push(`hn.created_by_user_id = ${actorParam}`);
+    clauses.push(`EXISTS (
+      SELECT 1 FROM handoff_note_recipients hnr
+      WHERE hnr.tenant_id = hn.tenant_id
+        AND hnr.handoff_note_id = hn.id
+        AND hnr.user_id = ${actorParam}
+    )`);
+
+    if (scope.clinics) {
+      const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
+      if (clinicIds.length > 0) {
+        values.push(clinicIds);
+        const clinicsParam = `$${values.length}`;
+        clauses.push(`EXISTS (
+          SELECT 1 FROM appointments a
+          WHERE a.tenant_id = hn.tenant_id
+            AND a.id = hn.appointment_id
+            AND a.clinic_id = ANY(${clinicsParam}::uuid[])
+            AND a.deleted_at IS NULL
+        )`);
+        clauses.push(`EXISTS (
+          SELECT 1 FROM appointments patient_scope
+          WHERE patient_scope.tenant_id = hn.tenant_id
+            AND patient_scope.patient_id = hn.patient_id
+            AND patient_scope.clinic_id = ANY(${clinicsParam}::uuid[])
+            AND patient_scope.deleted_at IS NULL
+        )`);
+      }
+    }
+
+    if (clauses.length === 0) return false;
+    filters.push(`(${clauses.join(" OR ")})`);
+    return true;
+  }
+
+  private async resolveAccessibleClinicIds(client: PoolClient, tenantId: string, userId: string) {
+    const result = await client.query<{ clinic_id: string }>(
+      `SELECT clinic_id FROM user_clinic_access WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, userId]
+    );
+    return result.rows.map((row) => row.clinic_id);
   }
 
   private async resolveDefaultRecipients(client: PoolClient, tenantId: string, actorId: string) {
