@@ -4,6 +4,7 @@ import { env } from "../../config/env.js";
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { UsersRepository } from "./users.repository.js";
 import type {
+  AdminReasonInput,
   ClinicAccessInput,
   CreateUserInput,
   ListUsersInput,
@@ -33,12 +34,12 @@ export class UsersService {
     return this.repository.update(context.tenantId, context.userId, userId, input);
   }
 
-  async delete(context: AuthenticatedRequestContext, userId: string) {
-    await this.repository.softDelete(context.tenantId, context.userId, userId);
+  async delete(context: AuthenticatedRequestContext, userId: string, input: AdminReasonInput = {}) {
+    await this.repository.softDelete(context.tenantId, context.userId, userId, input.reason);
   }
 
-  restore(context: AuthenticatedRequestContext, userId: string) {
-    return this.repository.restore(context.tenantId, context.userId, userId);
+  restore(context: AuthenticatedRequestContext, userId: string, input: AdminReasonInput = {}) {
+    return this.repository.restore(context.tenantId, context.userId, userId, input.reason);
   }
 
   replaceRoles(context: AuthenticatedRequestContext, userId: string, roleIds: string[]) {

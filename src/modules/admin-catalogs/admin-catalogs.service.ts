@@ -1,6 +1,7 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { AdminCatalogsRepository } from "./admin-catalogs.repository.js";
 import type {
+  AdminReasonInput,
   CreateAppointmentTypeInput,
   CreateClinicInput,
   CreateCollaboratorInput,
@@ -27,11 +28,11 @@ export class AdminCatalogsService {
   updateClinic(context: AuthenticatedRequestContext, id: string, input: UpdateClinicInput) {
     return this.repository.updateClinic(context.tenantId, context.userId, id, input);
   }
-  async deleteClinic(context: AuthenticatedRequestContext, id: string) {
-    await this.repository.softDeleteClinic(context.tenantId, context.userId, id);
+  async deleteClinic(context: AuthenticatedRequestContext, id: string, input: AdminReasonInput = {}) {
+    await this.repository.softDeleteClinic(context.tenantId, context.userId, id, input.reason);
   }
-  restoreClinic(context: AuthenticatedRequestContext, id: string) {
-    return this.repository.restoreClinic(context.tenantId, context.userId, id);
+  restoreClinic(context: AuthenticatedRequestContext, id: string, input: AdminReasonInput = {}) {
+    return this.repository.restoreClinic(context.tenantId, context.userId, id, input.reason);
   }
 
   listPatients(context: AuthenticatedRequestContext) {
@@ -53,11 +54,11 @@ export class AdminCatalogsService {
   updateRoom(context: AuthenticatedRequestContext, id: string, input: UpdateRoomInput) {
     return this.repository.updateRoom(context.tenantId, context.userId, id, input);
   }
-  async deleteRoom(context: AuthenticatedRequestContext, id: string) {
-    await this.repository.softDeleteRoom(context.tenantId, context.userId, id);
+  async deleteRoom(context: AuthenticatedRequestContext, id: string, input: AdminReasonInput = {}) {
+    await this.repository.softDeleteRoom(context.tenantId, context.userId, id, input.reason);
   }
-  restoreRoom(context: AuthenticatedRequestContext, id: string) {
-    return this.repository.restoreRoom(context.tenantId, context.userId, id);
+  restoreRoom(context: AuthenticatedRequestContext, id: string, input: AdminReasonInput = {}) {
+    return this.repository.restoreRoom(context.tenantId, context.userId, id, input.reason);
   }
 
   listAppointmentTypes(context: AuthenticatedRequestContext) {

@@ -6,6 +6,7 @@ import { parseWithSchema } from "../../shared/validators/parse-with-schema.js";
 import { UsersService } from "./users.service.js";
 import {
   createUserSchema,
+  adminReasonSchema,
   listUsersSchema,
   replaceClinicAccessSchema,
   replaceRolesSchema,
@@ -48,13 +49,15 @@ export class UsersController {
 
   readonly delete: RequestHandler = async (request, response) => {
     const { userId } = parseWithSchema(userIdParamsSchema, request.params);
-    await this.service.delete(request.auth!, userId);
+    const input = parseWithSchema(adminReasonSchema, request.body ?? {});
+    await this.service.delete(request.auth!, userId, input);
     response.status(204).send();
   };
 
   readonly restore: RequestHandler = async (request, response) => {
     const { userId } = parseWithSchema(userIdParamsSchema, request.params);
-    sendSuccess(response, await this.service.restore(request.auth!, userId));
+    const input = parseWithSchema(adminReasonSchema, request.body ?? {});
+    sendSuccess(response, await this.service.restore(request.auth!, userId, input));
   };
 
   readonly replaceRoles: RequestHandler = async (request, response) => {

@@ -37,8 +37,12 @@ export const updateUserSchema = z
 export const replaceRolesSchema = z.object({ roleIds: z.array(postgresUuid).min(1) });
 export const replaceClinicAccessSchema = z.object({ clinicAccess: z.array(clinicAccess) });
 export const updatePasswordSchema = z.object({ password: z.string().min(12).max(72) });
+export const adminReasonSchema = z.object({
+  reason: z.string().trim().min(1).max(500).optional()
+}).strict();
 
 export type ListUsersInput = z.output<typeof listUsersSchema>;
 export type CreateUserInput = z.output<typeof createUserSchema>;
 export type UpdateUserInput = z.output<typeof updateUserSchema>;
 export type ClinicAccessInput = z.output<typeof clinicAccess>;
+export type AdminReasonInput = z.output<typeof adminReasonSchema>;

@@ -9,27 +9,32 @@
 - Pruebas de contrato para validacion de `includeDeleted`, auditoria y UUIDs de usuario.
 - UI admin con mostrar/ocultar eliminados, restaurar y confirmacion inline para acciones destructivas.
 - Base de paginacion y filtros de alcance ya aplicada en modulos operativos principales.
+- Motivo opcional para soft delete/restauracion de usuarios, clinicas y consultorios, registrado en `audit_logs.metadata`.
+- SSE autenticado en `GET /api/realtime/events` con eventos de notificaciones creadas/leidas.
+- Front conectado al SSE autenticado mediante `fetch` streaming con Bearer token.
+- Matriz centralizada de permisos de frontend.
+- Combobox compartido de pacientes aplicado a asistencias y notas de enlace.
+- Badges de alcance para coordinador en asistencias.
+- Prueba de notificaciones con fixture para asegurar metadata de paciente.
+- Test de integracion Postgres para create/delete/restore de clinicas, activable con `CRIT_DB_INTEGRATION=1`.
+- Smoke E2E browser de front, activable con `CRIT_E2E_BROWSER=1` y Playwright instalado.
 
 ## Funcionales
 
-- Agregar pruebas end-to-end browser para el flujo completo: super admin, admin, calendario, check-in, asistencia, nota medica, nota de enlace y notificaciones.
-- Migrar todos los listados operativos a paginacion server-side estricta cuando haya datos productivos de alto volumen.
-- Agregar motivo obligatorio/opcional para soft delete y restauracion.
-- Mostrar una advertencia visual cuando la capacidad declarada de una clinica no coincida con la suma de consultorios.
-- Extraer el combobox de pacientes a un componente compartido real para evitar divergencias futuras.
-- Agregar pruebas especificas de notificaciones con fixtures de DB para asegurar que siempre incluyan paciente cuando exista relacion.
+- Ampliar el smoke E2E browser para ejecutar login real y flujo completo: super admin, admin, calendario, check-in, asistencia, nota medica, nota de enlace y notificaciones.
+- Migrar cualquier listado operativo futuro a paginacion server-side desde el primer contrato.
+- Decidir si el motivo de soft delete/restauracion debe pasar de opcional a obligatorio por politica de auditoria.
+- Extender el combobox compartido al calendario cuando se haga una refactorizacion completa de esa pantalla.
 
 ## Visuales y UX
 
-- Reducir textos tecnicos visibles para usuarios finales y moverlos a tooltips o ayuda contextual.
-- Mejorar estados vacios con acciones claras: crear cita, limpiar filtros o buscar otro paciente.
-- Revisar responsive del calendario en pantallas medianas cuando se ocultan filtros o se abre el panel de nueva cita.
-- Extender el patron de botones destructivos con confirmacion inline a todos los modulos futuros.
-- Agregar badges de rol/alcance para coordinadores: "mio", "equipo" o "area".
-- Mejorar legibilidad de tablas admin con acciones fijas al final y confirmaciones menos intrusivas que `window.confirm`.
+- Revisar textos restantes para mover ayuda tecnica a tooltips o documentacion.
+- Mejorar estados vacios con acciones claras en pantallas que aun no tienen CTA contextual.
+- Extender el patron de botones destructivos con motivo inline a modulos futuros.
+- Mejorar legibilidad de tablas admin con acciones fijas al final.
 
 ## Tecnicos
 
-- Centralizar permisos de front en una matriz compartida generada/validada contra docs backend.
-- Agregar tests de integracion con Postgres para endpoints admin de create/update/delete/restore.
-- Implementar SSE autenticado segun `docs/realtime-events.md`.
+- Generar/validar automaticamente la matriz de permisos de front contra docs backend.
+- Ampliar tests de integracion Postgres para usuarios y consultorios.
+- Publicar por SSE los eventos `appointment_changed`, `attendance_changed`, `reception_checkin_registered`, `handoff_note_created` y `handoff_note_read`.
