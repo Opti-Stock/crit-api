@@ -18,6 +18,7 @@ adminCatalogsRouter.use(
 adminCatalogsRouter.get("/clinics", controller.listClinics);
 adminCatalogsRouter.post("/clinics", controller.createClinic);
 adminCatalogsRouter.patch("/clinics/:id", controller.updateClinic);
+adminCatalogsRouter.delete("/clinics/:id", controller.deleteClinic);
 
 adminCatalogsRouter.get("/patients", controller.listPatients);
 adminCatalogsRouter.post("/patients", controller.createPatient);
@@ -26,6 +27,7 @@ adminCatalogsRouter.patch("/patients/:id", controller.updatePatient);
 adminCatalogsRouter.get("/rooms", controller.listRooms);
 adminCatalogsRouter.post("/rooms", controller.createRoom);
 adminCatalogsRouter.patch("/rooms/:id", controller.updateRoom);
+adminCatalogsRouter.delete("/rooms/:id", controller.deleteRoom);
 
 adminCatalogsRouter.get("/appointment-types", controller.listAppointmentTypes);
 adminCatalogsRouter.post("/appointment-types", controller.createAppointmentType);

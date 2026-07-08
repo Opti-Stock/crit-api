@@ -69,6 +69,28 @@ export class AdminCatalogsRepository {
     }, this.databasePool);
   }
 
+  softDeleteClinic(tenantId: string, actorId: string, id: string) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const result = await client.query(
+        `UPDATE clinics
+         SET status = 'inactive',
+             deleted_at = CURRENT_TIMESTAMP
+         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+         RETURNING id`,
+        [tenantId, id]
+      );
+      requireRow(result.rows[0], "Clinic not found", "CLINIC_NOT_FOUND");
+
+      await client.query(
+        `UPDATE rooms
+         SET status = 'inactive',
+             deleted_at = CURRENT_TIMESTAMP
+         WHERE tenant_id = $1 AND clinic_id = $2 AND deleted_at IS NULL`,
+        [tenantId, id]
+      );
+    }, this.databasePool);
+  }
+
   listPatients(tenantId: string, actorId: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
@@ -141,7 +163,7 @@ export class AdminCatalogsRepository {
       const result = await client.query(
         `SELECT r.id, r.clinic_id AS "clinicId", c.name AS "clinicName", r.name, r.capacity, r.status
          FROM rooms r
-         JOIN clinics c ON c.tenant_id = r.tenant_id AND c.id = r.clinic_id
+         JOIN clinics c ON c.tenant_id = r.tenant_id AND c.id = r.clinic_id AND c.deleted_at IS NULL
          WHERE r.tenant_id = $1 AND r.deleted_at IS NULL
          ORDER BY c.name, r.name`,
         [tenantId]
@@ -183,6 +205,20 @@ export class AdminCatalogsRepository {
       } catch (error) {
         throw mapCatalogError(error);
       }
+    }, this.databasePool);
+  }
+
+  softDeleteRoom(tenantId: string, actorId: string, id: string) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const result = await client.query(
+        `UPDATE rooms
+         SET status = 'inactive',
+             deleted_at = CURRENT_TIMESTAMP
+         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+         RETURNING id`,
+        [tenantId, id]
+      );
+      requireRow(result.rows[0], "Room not found", "ROOM_NOT_FOUND");
     }, this.databasePool);
   }
 

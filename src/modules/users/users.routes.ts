@@ -17,6 +17,7 @@ usersRouter.get("/", controller.list);
 usersRouter.post("/", controller.create);
 usersRouter.get("/:userId", controller.get);
 usersRouter.patch("/:userId", controller.update);
+usersRouter.delete("/:userId", controller.delete);
 usersRouter.put("/:userId/roles", controller.replaceRoles);
 usersRouter.put("/:userId/clinic-access", controller.replaceClinicAccess);
 usersRouter.put("/:userId/password", controller.updatePassword);

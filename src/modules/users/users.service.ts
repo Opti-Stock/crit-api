@@ -33,6 +33,10 @@ export class UsersService {
     return this.repository.update(context.tenantId, context.userId, userId, input);
   }
 
+  async delete(context: AuthenticatedRequestContext, userId: string) {
+    await this.repository.softDelete(context.tenantId, context.userId, userId);
+  }
+
   replaceRoles(context: AuthenticatedRequestContext, userId: string, roleIds: string[]) {
     return this.repository.replaceRoles(context.tenantId, context.userId, userId, roleIds);
   }
