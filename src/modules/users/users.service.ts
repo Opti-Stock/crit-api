@@ -37,6 +37,10 @@ export class UsersService {
     await this.repository.softDelete(context.tenantId, context.userId, userId);
   }
 
+  restore(context: AuthenticatedRequestContext, userId: string) {
+    return this.repository.restore(context.tenantId, context.userId, userId);
+  }
+
   replaceRoles(context: AuthenticatedRequestContext, userId: string, roleIds: string[]) {
     return this.repository.replaceRoles(context.tenantId, context.userId, userId, roleIds);
   }

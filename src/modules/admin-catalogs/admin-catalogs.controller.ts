@@ -10,6 +10,8 @@ import {
   createPatientSchema,
   createRoomSchema,
   idParamsSchema,
+  listAdminCatalogsSchema,
+  listAuditLogsSchema,
   updateAppointmentTypeSchema,
   updateClinicSchema,
   updateCollaboratorSchema,
@@ -21,7 +23,7 @@ export class AdminCatalogsController {
   constructor(private readonly service = new AdminCatalogsService()) {}
 
   readonly listClinics: RequestHandler = async (request, response) => {
-    sendSuccess(response, await this.service.listClinics(request.auth!));
+    sendSuccess(response, await this.service.listClinics(request.auth!, parseWithSchema(listAdminCatalogsSchema, request.query)));
   };
   readonly createClinic: RequestHandler = async (request, response) => {
     sendSuccess(response, await this.service.createClinic(request.auth!, parseWithSchema(createClinicSchema, request.body)), 201);
@@ -34,6 +36,10 @@ export class AdminCatalogsController {
     const { id } = parseWithSchema(idParamsSchema, request.params);
     await this.service.deleteClinic(request.auth!, id);
     response.status(204).send();
+  };
+  readonly restoreClinic: RequestHandler = async (request, response) => {
+    const { id } = parseWithSchema(idParamsSchema, request.params);
+    sendSuccess(response, await this.service.restoreClinic(request.auth!, id));
   };
 
   readonly listPatients: RequestHandler = async (request, response) => {
@@ -48,7 +54,7 @@ export class AdminCatalogsController {
   };
 
   readonly listRooms: RequestHandler = async (request, response) => {
-    sendSuccess(response, await this.service.listRooms(request.auth!));
+    sendSuccess(response, await this.service.listRooms(request.auth!, parseWithSchema(listAdminCatalogsSchema, request.query)));
   };
   readonly createRoom: RequestHandler = async (request, response) => {
     sendSuccess(response, await this.service.createRoom(request.auth!, parseWithSchema(createRoomSchema, request.body)), 201);
@@ -61,6 +67,10 @@ export class AdminCatalogsController {
     const { id } = parseWithSchema(idParamsSchema, request.params);
     await this.service.deleteRoom(request.auth!, id);
     response.status(204).send();
+  };
+  readonly restoreRoom: RequestHandler = async (request, response) => {
+    const { id } = parseWithSchema(idParamsSchema, request.params);
+    sendSuccess(response, await this.service.restoreRoom(request.auth!, id));
   };
 
   readonly listAppointmentTypes: RequestHandler = async (request, response) => {
@@ -83,5 +93,16 @@ export class AdminCatalogsController {
   readonly updateCollaborator: RequestHandler = async (request, response) => {
     const { id } = parseWithSchema(idParamsSchema, request.params);
     sendSuccess(response, await this.service.updateCollaborator(request.auth!, id, parseWithSchema(updateCollaboratorSchema, request.body)));
+  };
+
+  readonly listAuditLogs: RequestHandler = async (request, response) => {
+    const input = parseWithSchema(listAuditLogsSchema, request.query);
+    const result = await this.service.listAuditLogs(request.auth!, input);
+    sendSuccess(response, result.logs, 200, {
+      page: input.page,
+      pageSize: input.pageSize,
+      total: result.total,
+      totalPages: Math.ceil(result.total / input.pageSize)
+    });
   };
 }

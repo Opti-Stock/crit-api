@@ -6,6 +6,8 @@ import type {
   CreateCollaboratorInput,
   CreatePatientInput,
   CreateRoomInput,
+  ListAdminCatalogsInput,
+  ListAuditLogsInput,
   UpdateAppointmentTypeInput,
   UpdateClinicInput,
   UpdateCollaboratorInput,
@@ -16,8 +18,8 @@ import type {
 export class AdminCatalogsService {
   constructor(private readonly repository = new AdminCatalogsRepository()) {}
 
-  listClinics(context: AuthenticatedRequestContext) {
-    return this.repository.listClinics(context.tenantId, context.userId);
+  listClinics(context: AuthenticatedRequestContext, input: ListAdminCatalogsInput) {
+    return this.repository.listClinics(context.tenantId, context.userId, input);
   }
   createClinic(context: AuthenticatedRequestContext, input: CreateClinicInput) {
     return this.repository.createClinic(context.tenantId, context.userId, input);
@@ -27,6 +29,9 @@ export class AdminCatalogsService {
   }
   async deleteClinic(context: AuthenticatedRequestContext, id: string) {
     await this.repository.softDeleteClinic(context.tenantId, context.userId, id);
+  }
+  restoreClinic(context: AuthenticatedRequestContext, id: string) {
+    return this.repository.restoreClinic(context.tenantId, context.userId, id);
   }
 
   listPatients(context: AuthenticatedRequestContext) {
@@ -39,8 +44,8 @@ export class AdminCatalogsService {
     return this.repository.updatePatient(context.tenantId, context.userId, id, input);
   }
 
-  listRooms(context: AuthenticatedRequestContext) {
-    return this.repository.listRooms(context.tenantId, context.userId);
+  listRooms(context: AuthenticatedRequestContext, input: ListAdminCatalogsInput) {
+    return this.repository.listRooms(context.tenantId, context.userId, input);
   }
   createRoom(context: AuthenticatedRequestContext, input: CreateRoomInput) {
     return this.repository.createRoom(context.tenantId, context.userId, input);
@@ -50,6 +55,9 @@ export class AdminCatalogsService {
   }
   async deleteRoom(context: AuthenticatedRequestContext, id: string) {
     await this.repository.softDeleteRoom(context.tenantId, context.userId, id);
+  }
+  restoreRoom(context: AuthenticatedRequestContext, id: string) {
+    return this.repository.restoreRoom(context.tenantId, context.userId, id);
   }
 
   listAppointmentTypes(context: AuthenticatedRequestContext) {
@@ -70,5 +78,9 @@ export class AdminCatalogsService {
   }
   updateCollaborator(context: AuthenticatedRequestContext, id: string, input: UpdateCollaboratorInput) {
     return this.repository.updateCollaborator(context.tenantId, context.userId, id, input);
+  }
+
+  listAuditLogs(context: AuthenticatedRequestContext, input: ListAuditLogsInput) {
+    return this.repository.listAuditLogs(context.tenantId, context.userId, input);
   }
 }
