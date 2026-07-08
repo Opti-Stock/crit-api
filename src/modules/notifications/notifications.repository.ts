@@ -28,9 +28,33 @@ interface NotificationRow {
   title: string;
   message: string;
   metadata: Record<string, unknown> | null;
+  patient_id: string | null;
+  patient_full_name: string | null;
   read_at: string | null;
   created_at: string;
 }
+
+const UUID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
+const SELECT_NOTIFICATION = `
+  SELECT n.id, n.type, n.title, n.message, n.metadata,
+         patient_lookup.patient_id,
+         p.full_name AS patient_full_name,
+         n.read_at, n.created_at
+  FROM notifications n
+  LEFT JOIN LATERAL (
+    SELECT COALESCE(
+      n.metadata #>> '{patient,id}',
+      n.metadata #>> '{target,patientId}',
+      n.metadata ->> 'patientId'
+    ) AS patient_id
+  ) patient_lookup ON TRUE
+  LEFT JOIN patients p
+    ON p.tenant_id = n.tenant_id
+   AND p.deleted_at IS NULL
+   AND patient_lookup.patient_id ~* '${UUID_PATTERN}'
+   AND p.id = patient_lookup.patient_id::uuid
+`;
 
 /**
  * Inserts a notification using an existing client/transaction so other
@@ -67,24 +91,23 @@ export class NotificationsRepository {
 
   async list(tenantId: string, actorId: string, input: ListNotificationsInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
-      const filters = ["tenant_id = $1", "user_id = $2"];
+      const filters = ["n.tenant_id = $1", "n.user_id = $2"];
       const values: unknown[] = [tenantId, actorId];
 
-      if (input.status === "unread") filters.push("read_at IS NULL");
-      if (input.status === "read") filters.push("read_at IS NOT NULL");
+      if (input.status === "unread") filters.push("n.read_at IS NULL");
+      if (input.status === "read") filters.push("n.read_at IS NOT NULL");
 
       const where = filters.join(" AND ");
       const count = await client.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM notifications WHERE ${where}`,
+        `SELECT count(*)::text AS count FROM notifications n WHERE ${where}`,
         values
       );
 
       values.push(input.pageSize, (input.page - 1) * input.pageSize);
       const rows = await client.query<NotificationRow>(
-        `SELECT id, type, title, message, metadata, read_at, created_at
-         FROM notifications
+        `${SELECT_NOTIFICATION}
          WHERE ${where}
-         ORDER BY created_at DESC
+         ORDER BY n.created_at DESC
          LIMIT $${values.length - 1} OFFSET $${values.length}`,
         values
       );
@@ -137,9 +160,8 @@ export class NotificationsRepository {
     notificationId: string
   ) {
     const result = await client.query<NotificationRow>(
-      `SELECT id, type, title, message, metadata, read_at, created_at
-       FROM notifications
-       WHERE tenant_id = $1 AND id = $2 AND user_id = $3`,
+      `${SELECT_NOTIFICATION}
+       WHERE n.tenant_id = $1 AND n.id = $2 AND n.user_id = $3`,
       [tenantId, notificationId, actorId]
     );
     return result.rows[0] ? mapSummary(result.rows[0]) : null;
@@ -147,16 +169,34 @@ export class NotificationsRepository {
 }
 
 function mapSummary(row: NotificationRow): NotificationSummary {
+  const metadata = withPatientMetadata(row.metadata, row.patient_id, row.patient_full_name);
   return {
     id: row.id,
     type: row.type,
     title: row.title,
     message: row.message,
-    target: readObject(row.metadata?.target),
-    metadata: row.metadata ?? null,
+    target: readObject(metadata?.target),
+    metadata,
     readAt: row.read_at,
     createdAt: row.created_at
   };
+}
+
+function withPatientMetadata(
+  metadata: Record<string, unknown> | null,
+  patientId: string | null,
+  patientFullName: string | null
+): Record<string, unknown> | null {
+  const next = { ...(metadata ?? {}) };
+  if (!patientId && !patientFullName) return metadata ?? null;
+
+  const patient = readObject(next.patient) ?? {};
+  next.patient = {
+    ...patient,
+    ...(patientId ? { id: patientId } : {}),
+    ...(patientFullName ? { fullName: patientFullName } : {})
+  };
+  return next;
 }
 
 function readObject(value: unknown): Record<string, string> | null {

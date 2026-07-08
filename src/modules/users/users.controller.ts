@@ -46,6 +46,12 @@ export class UsersController {
     sendSuccess(response, await this.service.update(request.auth!, userId, input));
   };
 
+  readonly delete: RequestHandler = async (request, response) => {
+    const { userId } = parseWithSchema(userIdParamsSchema, request.params);
+    await this.service.delete(request.auth!, userId);
+    response.status(204).send();
+  };
+
   readonly replaceRoles: RequestHandler = async (request, response) => {
     const { userId } = parseWithSchema(userIdParamsSchema, request.params);
     const { roleIds } = parseWithSchema(replaceRolesSchema, request.body);

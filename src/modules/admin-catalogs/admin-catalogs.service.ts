@@ -25,6 +25,9 @@ export class AdminCatalogsService {
   updateClinic(context: AuthenticatedRequestContext, id: string, input: UpdateClinicInput) {
     return this.repository.updateClinic(context.tenantId, context.userId, id, input);
   }
+  async deleteClinic(context: AuthenticatedRequestContext, id: string) {
+    await this.repository.softDeleteClinic(context.tenantId, context.userId, id);
+  }
 
   listPatients(context: AuthenticatedRequestContext) {
     return this.repository.listPatients(context.tenantId, context.userId);
@@ -44,6 +47,9 @@ export class AdminCatalogsService {
   }
   updateRoom(context: AuthenticatedRequestContext, id: string, input: UpdateRoomInput) {
     return this.repository.updateRoom(context.tenantId, context.userId, id, input);
+  }
+  async deleteRoom(context: AuthenticatedRequestContext, id: string) {
+    await this.repository.softDeleteRoom(context.tenantId, context.userId, id);
   }
 
   listAppointmentTypes(context: AuthenticatedRequestContext) {

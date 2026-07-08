@@ -30,6 +30,11 @@ export class AdminCatalogsController {
     const { id } = parseWithSchema(idParamsSchema, request.params);
     sendSuccess(response, await this.service.updateClinic(request.auth!, id, parseWithSchema(updateClinicSchema, request.body)));
   };
+  readonly deleteClinic: RequestHandler = async (request, response) => {
+    const { id } = parseWithSchema(idParamsSchema, request.params);
+    await this.service.deleteClinic(request.auth!, id);
+    response.status(204).send();
+  };
 
   readonly listPatients: RequestHandler = async (request, response) => {
     sendSuccess(response, await this.service.listPatients(request.auth!));
@@ -51,6 +56,11 @@ export class AdminCatalogsController {
   readonly updateRoom: RequestHandler = async (request, response) => {
     const { id } = parseWithSchema(idParamsSchema, request.params);
     sendSuccess(response, await this.service.updateRoom(request.auth!, id, parseWithSchema(updateRoomSchema, request.body)));
+  };
+  readonly deleteRoom: RequestHandler = async (request, response) => {
+    const { id } = parseWithSchema(idParamsSchema, request.params);
+    await this.service.deleteRoom(request.auth!, id);
+    response.status(204).send();
   };
 
   readonly listAppointmentTypes: RequestHandler = async (request, response) => {

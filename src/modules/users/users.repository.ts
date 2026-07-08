@@ -126,6 +126,31 @@ export class UsersRepository {
     }, this.databasePool);
   }
 
+  async softDelete(tenantId: string, actorId: string, userId: string) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      await this.requireUser(client, tenantId, userId);
+      await this.assertNotLastAdmin(client, tenantId, userId);
+
+      const result = await client.query(
+        `UPDATE users
+         SET status = 'inactive',
+             deleted_at = CURRENT_TIMESTAMP
+         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+        [tenantId, userId]
+      );
+      if ((result.rowCount ?? 0) === 0) throw new NotFoundError("User not found", "USER_NOT_FOUND");
+
+      await client.query("DELETE FROM user_clinic_access WHERE tenant_id = $1 AND user_id = $2", [tenantId, userId]);
+      await client.query(
+        `UPDATE collaborators
+         SET status = 'inactive',
+             deleted_at = CURRENT_TIMESTAMP
+         WHERE tenant_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+        [tenantId, userId]
+      );
+    }, this.databasePool);
+  }
+
   async replaceRoles(tenantId: string, actorId: string, userId: string, roleIds: string[]) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       await this.requireUser(client, tenantId, userId);
