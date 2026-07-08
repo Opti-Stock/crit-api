@@ -25,6 +25,9 @@ export const listAuditLogsSchema = z.object({
   entityType: z.string().trim().max(100).optional(),
   entityId: postgresUuid.optional()
 });
+export const adminReasonSchema = z.object({
+  reason: z.string().trim().min(1).max(500).optional()
+}).strict();
 
 export const createClinicSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -80,6 +83,7 @@ export const updateCollaboratorSchema = createCollaboratorSchema
 export type CreateClinicInput = z.output<typeof createClinicSchema>;
 export type ListAdminCatalogsInput = z.output<typeof listAdminCatalogsSchema>;
 export type ListAuditLogsInput = z.output<typeof listAuditLogsSchema>;
+export type AdminReasonInput = z.output<typeof adminReasonSchema>;
 export type UpdateClinicInput = z.output<typeof updateClinicSchema>;
 export type CreatePatientInput = z.output<typeof createPatientSchema>;
 export type UpdatePatientInput = z.output<typeof updatePatientSchema>;

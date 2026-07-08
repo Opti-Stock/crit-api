@@ -129,7 +129,7 @@ export class UsersRepository {
     }, this.databasePool);
   }
 
-  async softDelete(tenantId: string, actorId: string, userId: string) {
+  async softDelete(tenantId: string, actorId: string, userId: string, reason?: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       await this.requireUser(client, tenantId, userId);
       await this.assertNotLastAdmin(client, tenantId, userId);
@@ -151,10 +151,11 @@ export class UsersRepository {
          WHERE tenant_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
         [tenantId, userId]
       );
+      await this.insertAdminAuditLog(client, tenantId, actorId, "users", userId, "soft_delete", reason);
     }, this.databasePool);
   }
 
-  async restore(tenantId: string, actorId: string, userId: string) {
+  async restore(tenantId: string, actorId: string, userId: string, reason?: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
         `UPDATE users
@@ -166,6 +167,7 @@ export class UsersRepository {
       );
       if ((result.rowCount ?? 0) === 0) throw new NotFoundError("User not found", "USER_NOT_FOUND");
       await this.syncCollaboratorForUser(client, tenantId, userId);
+      await this.insertAdminAuditLog(client, tenantId, actorId, "users", userId, "restore", reason);
       return (await this.findByIdWithClient(client, tenantId, userId, true))!;
     }, this.databasePool);
   }
@@ -388,6 +390,31 @@ export class UsersRepository {
         [tenantId, collaboratorId, clinic.clinic_id]
       );
     }
+  }
+
+  private async insertAdminAuditLog(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    entityType: string,
+    entityId: string,
+    operation: "soft_delete" | "restore",
+    reason?: string
+  ) {
+    await client.query(
+      `INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, $2, 'UPDATE', $3, $4, $5::jsonb)`,
+      [
+        tenantId,
+        actorId,
+        entityType,
+        entityId,
+        JSON.stringify({
+          operation,
+          ...(reason ? { reason } : {})
+        })
+      ]
+    );
   }
 }
 

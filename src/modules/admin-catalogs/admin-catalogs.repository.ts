@@ -71,7 +71,7 @@ export class AdminCatalogsRepository {
     }, this.databasePool);
   }
 
-  softDeleteClinic(tenantId: string, actorId: string, id: string) {
+  softDeleteClinic(tenantId: string, actorId: string, id: string, reason?: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
         `UPDATE clinics
@@ -90,10 +90,11 @@ export class AdminCatalogsRepository {
          WHERE tenant_id = $1 AND clinic_id = $2 AND deleted_at IS NULL`,
         [tenantId, id]
       );
+      await this.insertAdminAuditLog(client, tenantId, actorId, "clinics", id, "soft_delete", reason);
     }, this.databasePool);
   }
 
-  restoreClinic(tenantId: string, actorId: string, id: string) {
+  restoreClinic(tenantId: string, actorId: string, id: string, reason?: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
         `UPDATE clinics
@@ -103,7 +104,9 @@ export class AdminCatalogsRepository {
          RETURNING id, name, specialization, capacity, coordinator_id AS "coordinatorId", status, deleted_at AS "deletedAt"`,
         [tenantId, id]
       );
-      return requireRow(result.rows[0], "Clinic not found", "CLINIC_NOT_FOUND");
+      const clinic = requireRow(result.rows[0], "Clinic not found", "CLINIC_NOT_FOUND");
+      await this.insertAdminAuditLog(client, tenantId, actorId, "clinics", id, "restore", reason);
+      return clinic;
     }, this.databasePool);
   }
 
@@ -224,7 +227,7 @@ export class AdminCatalogsRepository {
     }, this.databasePool);
   }
 
-  softDeleteRoom(tenantId: string, actorId: string, id: string) {
+  softDeleteRoom(tenantId: string, actorId: string, id: string, reason?: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
         `UPDATE rooms
@@ -235,10 +238,11 @@ export class AdminCatalogsRepository {
         [tenantId, id]
       );
       requireRow(result.rows[0], "Room not found", "ROOM_NOT_FOUND");
+      await this.insertAdminAuditLog(client, tenantId, actorId, "rooms", id, "soft_delete", reason);
     }, this.databasePool);
   }
 
-  restoreRoom(tenantId: string, actorId: string, id: string) {
+  restoreRoom(tenantId: string, actorId: string, id: string, reason?: string) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
       const result = await client.query(
         `UPDATE rooms
@@ -255,7 +259,9 @@ export class AdminCatalogsRepository {
          RETURNING id, clinic_id AS "clinicId", name, capacity, status, deleted_at AS "deletedAt"`,
         [tenantId, id]
       );
-      return requireRow(result.rows[0], "Room not found or clinic is deleted", "ROOM_NOT_RESTORABLE");
+      const room = requireRow(result.rows[0], "Room not found or clinic is deleted", "ROOM_NOT_RESTORABLE");
+      await this.insertAdminAuditLog(client, tenantId, actorId, "rooms", id, "restore", reason);
+      return room;
     }, this.databasePool);
   }
 
@@ -510,6 +516,31 @@ export class AdminCatalogsRepository {
         [tenantId, collaboratorId, clinicId]
       );
     }
+  }
+
+  private async insertAdminAuditLog(
+    client: PoolClient,
+    tenantId: string,
+    actorId: string,
+    entityType: string,
+    entityId: string,
+    operation: "soft_delete" | "restore",
+    reason?: string
+  ) {
+    await client.query(
+      `INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, $2, 'UPDATE', $3, $4, $5::jsonb)`,
+      [
+        tenantId,
+        actorId,
+        entityType,
+        entityId,
+        JSON.stringify({
+          operation,
+          ...(reason ? { reason } : {})
+        })
+      ]
+    );
   }
 }
 

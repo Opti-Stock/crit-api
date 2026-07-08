@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { listAdminCatalogsSchema, listAuditLogsSchema } from "./admin-catalogs.validation.js";
+import { adminReasonSchema, listAdminCatalogsSchema, listAuditLogsSchema } from "./admin-catalogs.validation.js";
 
 const uuid = "11111111-1111-4111-8111-111111111111";
 
@@ -24,4 +24,10 @@ test("audit log validation paginates and filters by audited entity", () => {
     entityType: "users",
     entityId: uuid
   });
+});
+
+test("admin catalog delete and restore reason validation is optional and bounded", () => {
+  assert.deepEqual(adminReasonSchema.parse({}), {});
+  assert.deepEqual(adminReasonSchema.parse({ reason: "Registro duplicado" }), { reason: "Registro duplicado" });
+  assert.throws(() => adminReasonSchema.parse({ reason: "" }));
 });

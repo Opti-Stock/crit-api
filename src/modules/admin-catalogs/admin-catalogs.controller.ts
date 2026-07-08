@@ -4,6 +4,7 @@ import { sendSuccess } from "../../shared/responses/api-response.js";
 import { parseWithSchema } from "../../shared/validators/parse-with-schema.js";
 import { AdminCatalogsService } from "./admin-catalogs.service.js";
 import {
+  adminReasonSchema,
   createAppointmentTypeSchema,
   createClinicSchema,
   createCollaboratorSchema,
@@ -34,12 +35,14 @@ export class AdminCatalogsController {
   };
   readonly deleteClinic: RequestHandler = async (request, response) => {
     const { id } = parseWithSchema(idParamsSchema, request.params);
-    await this.service.deleteClinic(request.auth!, id);
+    const input = parseWithSchema(adminReasonSchema, request.body ?? {});
+    await this.service.deleteClinic(request.auth!, id, input);
     response.status(204).send();
   };
   readonly restoreClinic: RequestHandler = async (request, response) => {
     const { id } = parseWithSchema(idParamsSchema, request.params);
-    sendSuccess(response, await this.service.restoreClinic(request.auth!, id));
+    const input = parseWithSchema(adminReasonSchema, request.body ?? {});
+    sendSuccess(response, await this.service.restoreClinic(request.auth!, id, input));
   };
 
   readonly listPatients: RequestHandler = async (request, response) => {
@@ -65,12 +68,14 @@ export class AdminCatalogsController {
   };
   readonly deleteRoom: RequestHandler = async (request, response) => {
     const { id } = parseWithSchema(idParamsSchema, request.params);
-    await this.service.deleteRoom(request.auth!, id);
+    const input = parseWithSchema(adminReasonSchema, request.body ?? {});
+    await this.service.deleteRoom(request.auth!, id, input);
     response.status(204).send();
   };
   readonly restoreRoom: RequestHandler = async (request, response) => {
     const { id } = parseWithSchema(idParamsSchema, request.params);
-    sendSuccess(response, await this.service.restoreRoom(request.auth!, id));
+    const input = parseWithSchema(adminReasonSchema, request.body ?? {});
+    sendSuccess(response, await this.service.restoreRoom(request.auth!, id, input));
   };
 
   readonly listAppointmentTypes: RequestHandler = async (request, response) => {
