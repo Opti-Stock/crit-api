@@ -14,6 +14,7 @@ import { handoffNotesRouter } from "../../modules/handoff-notes/handoff-notes.ro
 import { medicalNotesRouter } from "../../modules/medical-notes/medical-notes.routes.js";
 import { notificationsRouter } from "../../modules/notifications/notifications.routes.js";
 import { patientsRouter } from "../../modules/patients/patients.routes.js";
+import { realtimeRouter } from "../../modules/realtime/realtime.routes.js";
 import { roomsRouter } from "../../modules/rooms/rooms.routes.js";
 
 export const app = express();
@@ -40,6 +41,7 @@ app.use("/api/attendance", attendanceRouter);
 app.use("/api/medical-notes", medicalNotesRouter);
 app.use("/api/handoff-notes", handoffNotesRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/realtime", realtimeRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

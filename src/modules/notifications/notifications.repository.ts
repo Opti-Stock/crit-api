@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
 import { BadRequestError, NotFoundError } from "../../shared/errors/app-error.js";
+import { realtimeBus } from "../../shared/realtime/realtime-bus.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
 import type { CreateNotificationInput, ListNotificationsInput } from "./notifications.validation.js";
 
@@ -72,9 +73,10 @@ export async function insertNotification(
     metadata?: Record<string, unknown>;
   }
 ): Promise<void> {
-  await client.query(
+  const inserted = await client.query<{ id: string }>(
     `INSERT INTO notifications (tenant_id, user_id, type, title, message, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id`,
     [
       params.tenantId,
       params.userId,
@@ -84,6 +86,24 @@ export async function insertNotification(
       params.metadata ?? {}
     ]
   );
+  const notification = await findNotificationByIdWithClient(
+    client,
+    params.tenantId,
+    params.userId,
+    inserted.rows[0]!.id
+  );
+
+  if (!notification) return;
+
+  realtimeBus.publish({
+    tenantId: params.tenantId,
+    userId: params.userId,
+    type: "notification_created",
+    data: {
+      notification,
+      unreadCount: await countUnreadWithClient(client, params.tenantId, params.userId)
+    }
+  });
 }
 
 export class NotificationsRepository {
@@ -134,7 +154,17 @@ export class NotificationsRepository {
            RETURNING id`,
           [tenantId, input.userId, input.type, input.title, input.message, input.metadata ?? {}]
         );
-        return (await this.findByIdWithClient(client, tenantId, input.userId, inserted.rows[0]!.id))!;
+        const notification = (await findNotificationByIdWithClient(client, tenantId, input.userId, inserted.rows[0]!.id))!;
+        realtimeBus.publish({
+          tenantId,
+          userId: input.userId,
+          type: "notification_created",
+          data: {
+            notification,
+            unreadCount: await countUnreadWithClient(client, tenantId, input.userId)
+          }
+        });
+        return notification;
       } catch (error) {
         throw mapDatabaseError(error);
       }
@@ -149,7 +179,17 @@ export class NotificationsRepository {
         [tenantId, notificationId, actorId]
       );
       if (result.rowCount === 0) throw new NotFoundError("Notification not found", "NOTIFICATION_NOT_FOUND");
-      return (await this.findByIdWithClient(client, tenantId, actorId, notificationId))!;
+      const notification = (await findNotificationByIdWithClient(client, tenantId, actorId, notificationId))!;
+      realtimeBus.publish({
+        tenantId,
+        userId: actorId,
+        type: "notification_read",
+        data: {
+          notificationId,
+          unreadCount: await countUnreadWithClient(client, tenantId, actorId)
+        }
+      });
+      return notification;
     }, this.databasePool);
   }
 
@@ -166,6 +206,35 @@ export class NotificationsRepository {
     );
     return result.rows[0] ? mapSummary(result.rows[0]) : null;
   }
+
+}
+
+async function findNotificationByIdWithClient(
+  client: PoolClient,
+  tenantId: string,
+  userId: string,
+  notificationId: string
+): Promise<NotificationSummary | null> {
+  const result = await client.query<NotificationRow>(
+    `${SELECT_NOTIFICATION}
+     WHERE n.tenant_id = $1 AND n.id = $2 AND n.user_id = $3`,
+    [tenantId, notificationId, userId]
+  );
+  return result.rows[0] ? mapSummary(result.rows[0]) : null;
+}
+
+async function countUnreadWithClient(client: PoolClient, tenantId: string, userId: string): Promise<number> {
+  const result = await client.query<{ count: string }>(
+    `SELECT count(*)::text AS count
+     FROM notifications
+     WHERE tenant_id = $1 AND user_id = $2 AND read_at IS NULL`,
+    [tenantId, userId]
+  );
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+export function mapNotificationRowForTest(row: NotificationRow): NotificationSummary {
+  return mapSummary(row);
 }
 
 function mapSummary(row: NotificationRow): NotificationSummary {
