@@ -19,6 +19,11 @@ export const listCheckinAppointmentsSchema = z.object({
 });
 
 export const checkInAppointmentSchema = z.object({}).strict();
+export const scanCheckinSchema = z.object({
+  code: z.string().trim().min(1).max(255),
+  date: optionalString(z.iso.date())
+}).strict();
 
 export type ListCheckinAppointmentsInput = z.output<typeof listCheckinAppointmentsSchema>;
 export type CheckInAppointmentInput = z.output<typeof checkInAppointmentSchema>;
+export type ScanCheckinInput = z.output<typeof scanCheckinSchema>;

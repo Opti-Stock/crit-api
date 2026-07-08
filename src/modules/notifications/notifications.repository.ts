@@ -71,8 +71,11 @@ export async function insertNotification(
     title: string;
     message: string;
     metadata?: Record<string, unknown>;
+    actorId?: string;
   }
 ): Promise<void> {
+  if (params.actorId && params.actorId === params.userId) return;
+
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO notifications (tenant_id, user_id, type, title, message, metadata)
      VALUES ($1, $2, $3, $4, $5, $6)

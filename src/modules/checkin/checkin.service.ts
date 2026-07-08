@@ -1,6 +1,6 @@
 import type { AuthenticatedRequestContext } from "../../types/global.js";
 import { CheckinRepository } from "./checkin.repository.js";
-import type { ListCheckinAppointmentsInput } from "./checkin.validation.js";
+import type { ListCheckinAppointmentsInput, ScanCheckinInput } from "./checkin.validation.js";
 
 export class CheckinService {
   constructor(private readonly repository = new CheckinRepository()) {}
@@ -15,5 +15,9 @@ export class CheckinService {
 
   checkIn(context: AuthenticatedRequestContext, appointmentId: string) {
     return this.repository.checkIn(context.tenantId, context.userId, context.roles, appointmentId);
+  }
+
+  scanCheckIn(context: AuthenticatedRequestContext, input: ScanCheckinInput) {
+    return this.repository.scanCheckIn(context.tenantId, context.userId, context.roles, input);
   }
 }

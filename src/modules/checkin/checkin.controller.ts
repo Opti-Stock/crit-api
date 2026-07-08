@@ -6,7 +6,8 @@ import { parseWithSchema } from "../../shared/validators/parse-with-schema.js";
 import { CheckinService } from "./checkin.service.js";
 import {
   checkinAppointmentIdParamsSchema,
-  listCheckinAppointmentsSchema
+  listCheckinAppointmentsSchema,
+  scanCheckinSchema
 } from "./checkin.validation.js";
 
 export class CheckinController {
@@ -27,5 +28,10 @@ export class CheckinController {
   readonly checkIn: RequestHandler = async (request, response) => {
     const { appointmentId } = parseWithSchema(checkinAppointmentIdParamsSchema, request.params);
     sendSuccess(response, await this.service.checkIn(request.auth!, appointmentId), 201);
+  };
+
+  readonly scanCheckIn: RequestHandler = async (request, response) => {
+    const input = parseWithSchema(scanCheckinSchema, request.body);
+    sendSuccess(response, await this.service.scanCheckIn(request.auth!, input), 201);
   };
 }

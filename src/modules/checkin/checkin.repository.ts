@@ -2,8 +2,8 @@ import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
-import { ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
-import type { ListCheckinAppointmentsInput } from "./checkin.validation.js";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
+import type { ListCheckinAppointmentsInput, ScanCheckinInput } from "./checkin.validation.js";
 
 export interface CheckinAppointmentSummary {
   id: string;
@@ -23,6 +23,13 @@ export interface CheckinAppointmentSummary {
     status: string;
     checkedAt: string | null;
   } | null;
+}
+
+export interface ScanCheckinResult {
+  patient: { id: string; fullName: string; externalId: string | null };
+  checkedIn: boolean;
+  alreadyCheckedIn: boolean;
+  appointments: CheckinAppointmentSummary[];
 }
 
 interface CheckinAppointmentRow {
@@ -146,8 +153,9 @@ export class CheckinRepository {
         patient_id: string;
         collaborator_id: string;
         clinic_id: string;
+        starts_at: string;
       }>(
-        `SELECT patient_id, collaborator_id, clinic_id
+        `SELECT patient_id, collaborator_id, clinic_id, starts_at
          FROM appointments
          WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
         [tenantId, appointmentId]
@@ -156,28 +164,122 @@ export class CheckinRepository {
       if (!appointmentRow) throw new NotFoundError("Appointment not found", "APPOINTMENT_NOT_FOUND");
       await this.assertCanAccessClinic(client, tenantId, actorId, actorRoles, appointmentRow.clinic_id);
 
-      const existing = await client.query<{ id: string }>(
-        `SELECT id FROM appointment_check_ins
-         WHERE tenant_id = $1 AND appointment_id = $2 AND deleted_at IS NULL`,
-        [tenantId, appointmentId]
+      const existingForDay = await client.query<{ id: string }>(
+        `SELECT aci.id
+         FROM appointment_check_ins aci
+         JOIN appointments a ON a.tenant_id = aci.tenant_id AND a.id = aci.appointment_id
+         WHERE aci.tenant_id = $1
+           AND aci.patient_id = $2
+           AND aci.deleted_at IS NULL
+           AND a.starts_at >= $3::timestamptz::date
+           AND a.starts_at < ($3::timestamptz::date + INTERVAL '1 day')
+         LIMIT 1`,
+        [tenantId, appointmentRow.patient_id, appointmentRow.starts_at]
       );
-      if (existing.rows[0]) {
-        throw new ConflictError("Appointment already has attendance", "CHECKIN_ALREADY_REGISTERED");
+      if (existingForDay.rows[0]) {
+        throw new ConflictError("Patient already has check-in for this day", "CHECKIN_ALREADY_REGISTERED");
       }
 
       await client.query(
         `INSERT INTO appointment_check_ins (
            tenant_id, appointment_id, patient_id, checked_in_by_user_id
-         ) VALUES ($1, $2, $3, $4)`,
+         )
+         SELECT a.tenant_id, a.id, a.patient_id, $3
+         FROM appointments a
+         WHERE a.tenant_id = $1
+           AND a.patient_id = $2
+           AND a.deleted_at IS NULL
+           AND a.status IN ('scheduled', 'rescheduled')
+           AND a.starts_at >= $4::timestamptz::date
+           AND a.starts_at < ($4::timestamptz::date + INTERVAL '1 day')
+         ON CONFLICT (tenant_id, appointment_id) DO NOTHING`,
         [
           tenantId,
-          appointmentId,
           appointmentRow.patient_id,
-          actorId
+          actorId,
+          appointmentRow.starts_at
         ]
       );
 
       return this.getAppointmentWithClient(client, tenantId, appointmentId);
+    }, this.databasePool);
+  }
+
+  scanCheckIn(
+    tenantId: string,
+    actorId: string,
+    actorRoles: string[],
+    input: ScanCheckinInput
+  ) {
+    return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const patient = await client.query<{ id: string; full_name: string; external_id: string | null }>(
+        `SELECT id, full_name, external_id
+         FROM patients
+         WHERE tenant_id = $1
+           AND deleted_at IS NULL
+           AND status = 'active'
+           AND (
+             id::text = $2
+             OR external_id = $2
+             OR full_name ILIKE $3
+           )
+         ORDER BY CASE WHEN external_id = $2 OR id::text = $2 THEN 0 ELSE 1 END, full_name
+         LIMIT 1`,
+        [tenantId, input.code, `%${input.code}%`]
+      );
+      const patientRow = patient.rows[0];
+      if (!patientRow) throw new NotFoundError("Patient not found for badge", "CHECKIN_PATIENT_NOT_FOUND");
+
+      const date = input.date ?? new Date().toISOString().slice(0, 10);
+      const appointmentFilters = ["a.tenant_id = $1", "a.patient_id = $2", "a.deleted_at IS NULL"];
+      const values: unknown[] = [tenantId, patientRow.id];
+      await this.appendAccessFilter(client, tenantId, actorId, actorRoles, values, appointmentFilters);
+      values.push(date);
+      appointmentFilters.push(`a.starts_at >= $${values.length}::date`);
+      appointmentFilters.push(`a.starts_at < ($${values.length}::date + INTERVAL '1 day')`);
+
+      const appointments = await client.query<CheckinAppointmentRow>(
+        `${SELECT_CHECKIN_APPOINTMENT}
+         WHERE ${appointmentFilters.join(" AND ")}
+         ORDER BY a.starts_at, p.full_name`,
+        values
+      );
+      if (appointments.rows.length === 0) {
+        throw new BadRequestError("Patient has no appointments for this day", "CHECKIN_NO_APPOINTMENTS_FOR_DAY");
+      }
+
+      const alreadyCheckedIn = appointments.rows.some((row) => row.check_in_id);
+      if (!alreadyCheckedIn) {
+        await client.query(
+          `INSERT INTO appointment_check_ins (
+             tenant_id, appointment_id, patient_id, checked_in_by_user_id
+           )
+           SELECT a.tenant_id, a.id, a.patient_id, $3
+           FROM appointments a
+           WHERE a.tenant_id = $1
+             AND a.patient_id = $2
+             AND a.deleted_at IS NULL
+             AND a.status IN ('scheduled', 'rescheduled')
+             AND a.starts_at >= $4::date
+             AND a.starts_at < ($4::date + INTERVAL '1 day')
+           ON CONFLICT (tenant_id, appointment_id) DO NOTHING`,
+          [tenantId, patientRow.id, actorId, date]
+        );
+      }
+
+      const refreshed = await client.query<CheckinAppointmentRow>(
+        `${SELECT_CHECKIN_APPOINTMENT}
+         WHERE ${appointmentFilters.join(" AND ")}
+         ORDER BY a.starts_at, p.full_name`,
+        values
+      );
+
+      return {
+        patient: { id: patientRow.id, fullName: patientRow.full_name, externalId: patientRow.external_id },
+        checkedIn: true,
+        alreadyCheckedIn,
+        appointments: refreshed.rows.map(mapAppointment)
+      };
     }, this.databasePool);
   }
 

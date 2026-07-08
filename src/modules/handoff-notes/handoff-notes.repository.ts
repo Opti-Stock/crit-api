@@ -190,6 +190,7 @@ export class HandoffNotesRepository {
         for (const recipientId of recipientIds.filter((recipientId) => recipientId !== actorId)) {
           await insertNotification(client, {
             tenantId,
+            actorId,
             userId: recipientId,
             type: "handoff_note_received",
             title: "Nueva nota de enlace",
