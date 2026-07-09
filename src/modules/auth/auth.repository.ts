@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 
 import { pool } from "../../config/db.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
+import { ServiceUnavailableError } from "../../shared/errors/app-error.js";
 
 export interface AuthCredentialRecord {
   id: string;
@@ -36,39 +37,47 @@ export class AuthRepository implements AuthRepositoryContract {
   constructor(private readonly databasePool: Pool = pool) {}
 
   async findActiveCredentialsByEmail(email: string): Promise<AuthCredentialRecord[]> {
-    const tenants = await this.listActiveTenants();
-    const matches: AuthCredentialRecord[] = [];
+    try {
+      const tenants = await this.listActiveTenants();
+      const matches: AuthCredentialRecord[] = [];
 
-    for (const tenantId of tenants) {
-      const credentials = await this.findActiveCredentialsInTenant(tenantId, email);
-      if (credentials) {
-        matches.push(credentials);
+      for (const tenantId of tenants) {
+        const credentials = await this.findActiveCredentialsInTenant(tenantId, email);
+        if (credentials) {
+          matches.push(credentials);
+        }
+
+        if (matches.length > 1) {
+          break;
+        }
       }
 
-      if (matches.length > 1) {
-        break;
-      }
+      return matches;
+    } catch (error) {
+      throw mapDatabaseConnectivityError(error);
     }
-
-    return matches;
   }
 
   async recordSuccessfulLogin(tenantId: string, userId: string): Promise<void> {
-    await withTenantTransaction(
-      { tenantId, userId },
-      async (client) => {
-        await client.query(
-          `UPDATE users
-           SET last_login_at = CURRENT_TIMESTAMP
-           WHERE tenant_id = $1
-             AND id = $2
-             AND status = 'active'
-             AND deleted_at IS NULL`,
-          [tenantId, userId]
-        );
-      },
-      this.databasePool
-    );
+    try {
+      await withTenantTransaction(
+        { tenantId, userId },
+        async (client) => {
+          await client.query(
+            `UPDATE users
+             SET last_login_at = CURRENT_TIMESTAMP
+             WHERE tenant_id = $1
+               AND id = $2
+               AND status = 'active'
+               AND deleted_at IS NULL`,
+            [tenantId, userId]
+          );
+        },
+        this.databasePool
+      );
+    } catch (error) {
+      throw mapDatabaseConnectivityError(error);
+    }
   }
 
   private async listActiveTenants(): Promise<string[]> {
@@ -141,4 +150,32 @@ export class AuthRepository implements AuthRepositoryContract {
       this.databasePool
     );
   }
+}
+
+function mapDatabaseConnectivityError(error: unknown): never {
+  if (isDatabaseConnectivityError(error)) {
+    throw new ServiceUnavailableError(
+      "Database is unavailable",
+      "DATABASE_UNAVAILABLE"
+    );
+  }
+
+  throw error;
+}
+
+function isDatabaseConnectivityError(error: unknown): boolean {
+  const errorName = error instanceof Error ? error.name : undefined;
+  if (errorName === "AggregateError") return true;
+
+  const code = (error as { code?: unknown } | null)?.code;
+  return (
+    code === "ECONNREFUSED" ||
+    code === "ENOTFOUND" ||
+    code === "ETIMEDOUT" ||
+    code === "EAI_AGAIN" ||
+    code === "ECONNRESET" ||
+    code === "57P01" ||
+    code === "57P02" ||
+    code === "57P03"
+  );
 }
