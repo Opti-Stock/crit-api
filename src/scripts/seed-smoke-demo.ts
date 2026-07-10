@@ -274,7 +274,30 @@ const DEMO_APPOINTMENT_TYPES = [
   { key: "valoracion", name: "Smoke Valoracion Inicial", duration: 60 }
 ] as const;
 
-const DEMO_APPOINTMENTS = [
+type DemoUserKey = (typeof DEMO_USERS)[number]["key"];
+type DemoClinicKey = (typeof DEMO_CLINICS)[number]["key"];
+type DemoRoomKey = (typeof DEMO_CLINICS)[number]["rooms"][number]["key"];
+type DemoPatientKey = (typeof DEMO_PATIENTS)[number]["key"];
+type DemoAppointmentTypeKey = (typeof DEMO_APPOINTMENT_TYPES)[number]["key"];
+
+interface DemoAppointmentConfig {
+  key: string;
+  patientKey: DemoPatientKey;
+  userKey: DemoUserKey;
+  clinicKey: DemoClinicKey;
+  roomKey: DemoRoomKey;
+  typeKey: DemoAppointmentTypeKey;
+  date: string;
+  time: string;
+  duration: number;
+  status: "scheduled" | "rescheduled" | "cancelled";
+  checkIn: boolean;
+  attendance?: "present" | "absent" | "rescheduled";
+  medicalNote?: boolean;
+  handoff?: boolean;
+}
+
+const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
   {
     key: "junio_presente_norte",
     patientKey: "norte_asiste",
@@ -416,11 +439,40 @@ const DEMO_APPOINTMENTS = [
   }
 ] as const;
 
-type DemoUserKey = (typeof DEMO_USERS)[number]["key"];
-type DemoClinicKey = (typeof DEMO_CLINICS)[number]["key"];
-type DemoRoomKey = (typeof DEMO_CLINICS)[number]["rooms"][number]["key"];
-type DemoPatientKey = (typeof DEMO_PATIENTS)[number]["key"];
-type DemoAppointmentTypeKey = (typeof DEMO_APPOINTMENT_TYPES)[number]["key"];
+const WEEKLY_APPOINTMENT_TEMPLATES = [
+  {
+    suffix: "norte-med",
+    patientKey: "norte_asiste",
+    userKey: "medico_norte",
+    clinicKey: "norte",
+    roomKey: "norte-consultorio-1",
+    typeKey: "medicina",
+    time: "08:00",
+    duration: 45
+  },
+  {
+    suffix: "sur-terapia",
+    patientKey: "sur_checkin",
+    userKey: "terapeuta_sur",
+    clinicKey: "sur",
+    roomKey: "sur-terapia-a",
+    typeKey: "terapia_fisica",
+    time: "10:00",
+    duration: 50
+  },
+  {
+    suffix: "infantil-lenguaje",
+    patientKey: "infantil_lenguaje",
+    userKey: "terapeuta_infantil",
+    clinicKey: "infantil",
+    roomKey: "infantil-lenguaje",
+    typeKey: "lenguaje",
+    time: "12:00",
+    duration: 40
+  }
+] as const satisfies readonly (Omit<DemoAppointmentConfig, "key" | "date" | "status" | "checkIn" | "attendance" | "medicalNote" | "handoff"> & {
+  suffix: string;
+})[];
 
 interface DemoUser {
   id: string;
@@ -480,6 +532,7 @@ async function seedSmokeDemo() {
     const users = await upsertUsers(client, tenantId, roleIds, clinics, passwordHash);
     const patients = await upsertPatients(client, tenantId);
     const appointmentTypes = await upsertAppointmentTypes(client, tenantId);
+    const appointmentConfigs = getDemoAppointmentConfigs();
 
     await linkFamilyUserToPatient(client, tenantId, users.familia.id, patients.norte_asiste.id);
 
@@ -489,17 +542,18 @@ async function seedSmokeDemo() {
       rooms,
       appointmentTypes,
       patients,
-      users
+      users,
+      appointmentConfigs
     });
 
     const attendanceRecords: DemoAppointment[] = [];
-    for (const appointmentConfig of DEMO_APPOINTMENTS) {
+    for (const appointmentConfig of appointmentConfigs) {
       const appointment = appointments[appointmentConfig.key];
       if (appointmentConfig.checkIn) {
         await upsertCheckIn(client, tenantId, appointment, users.recepcion_general.id);
       }
-      const attendanceStatus = "attendance" in appointmentConfig ? appointmentConfig.attendance : undefined;
-      const requiresMedicalNote = "medicalNote" in appointmentConfig && appointmentConfig.medicalNote === true;
+      const attendanceStatus = appointmentConfig.attendance;
+      const requiresMedicalNote = appointmentConfig.medicalNote === true;
       if (attendanceStatus) {
         await upsertAttendance(
           client,
@@ -513,9 +567,9 @@ async function seedSmokeDemo() {
       }
     }
 
-    for (const appointmentConfig of DEMO_APPOINTMENTS.filter((appointment) => "medicalNote" in appointment && appointment.medicalNote)) {
+    for (const appointmentConfig of appointmentConfigs.filter((appointment) => appointment.medicalNote)) {
       const appointment = appointments[appointmentConfig.key];
-      const attendanceStatus = "attendance" in appointmentConfig ? appointmentConfig.attendance : "present";
+      const attendanceStatus = appointmentConfig.attendance ?? "present";
       const attendance = await upsertAttendance(
         client,
         tenantId,
@@ -541,7 +595,7 @@ async function seedSmokeDemo() {
       users.direccion.id
     ];
 
-    for (const appointmentConfig of DEMO_APPOINTMENTS.filter((appointment) => "handoff" in appointment && appointment.handoff)) {
+    for (const appointmentConfig of appointmentConfigs.filter((appointment) => appointment.handoff)) {
       await setCurrentUser(client, users.acompanamiento_norte.id);
       await upsertHandoffNote(client, tenantId, {
         appointment: appointments[appointmentConfig.key],
@@ -867,6 +921,63 @@ async function upsertAppointmentTypes(client: PoolClient, tenantId: string) {
   return appointmentTypes;
 }
 
+function getDemoAppointmentConfigs(): readonly DemoAppointmentConfig[] {
+  return [...DEMO_APPOINTMENTS, ...buildWeeklyAppointmentConfigs()];
+}
+
+function buildWeeklyAppointmentConfigs(): DemoAppointmentConfig[] {
+  const today = new Date();
+  const reference = new Date(Date.UTC(DEMO_YEAR, today.getMonth(), today.getDate()));
+  const currentWeekStart = startOfWeekMonday(reference);
+  const todayKey = dateKey(reference);
+  const appointments: DemoAppointmentConfig[] = [];
+
+  for (let dayOffset = 0; dayOffset < 14; dayOffset += 1) {
+    const day = addDays(currentWeekStart, dayOffset);
+    const dayId = dateKey(day);
+    const monthDay = formatMonthDay(day);
+
+    WEEKLY_APPOINTMENT_TEMPLATES.forEach((template, templateIndex) => {
+      const sequence = dayOffset * WEEKLY_APPOINTMENT_TEMPLATES.length + templateIndex;
+      const status = resolveWeeklyStatus(sequence);
+      const isTodayOrPast = dayId <= todayKey;
+      const attendance = resolveWeeklyAttendance(status, isTodayOrPast, templateIndex, sequence);
+
+      appointments.push({
+        ...template,
+        key: `semana-${dayId}-${template.suffix}`,
+        date: monthDay,
+        status,
+        checkIn: status !== "cancelled" && isTodayOrPast && templateIndex !== 2,
+        attendance,
+        medicalNote: attendance === "present" && sequence % 4 === 0,
+        handoff: status !== "cancelled" && sequence % 5 === 0
+      });
+    });
+  }
+
+  return appointments;
+}
+
+function resolveWeeklyStatus(sequence: number): DemoAppointmentConfig["status"] {
+  if (sequence % 11 === 0) return "cancelled";
+  if (sequence % 7 === 0) return "rescheduled";
+  return "scheduled";
+}
+
+function resolveWeeklyAttendance(
+  status: DemoAppointmentConfig["status"],
+  isTodayOrPast: boolean,
+  templateIndex: number,
+  sequence: number
+): DemoAppointmentConfig["attendance"] | undefined {
+  if (!isTodayOrPast || status === "cancelled") return undefined;
+  if (status === "rescheduled") return "rescheduled";
+  if (templateIndex === 0) return "present";
+  if (templateIndex === 1 && sequence % 3 === 0) return "absent";
+  return undefined;
+}
+
 async function upsertAppointmentType(client: PoolClient, tenantId: string, name: string, duration: number) {
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM appointment_types
@@ -907,11 +1018,12 @@ async function upsertAppointments(
     appointmentTypes: Record<DemoAppointmentTypeKey, { id: string }>;
     patients: Record<DemoPatientKey, DemoPatient>;
     users: Record<DemoUserKey, DemoUser>;
+    appointmentConfigs: readonly DemoAppointmentConfig[];
   }
 ) {
   const appointments: Record<string, DemoAppointment> = {};
 
-  for (const appointment of DEMO_APPOINTMENTS) {
+  for (const appointment of input.appointmentConfigs) {
     appointments[appointment.key] = await upsertAppointment(client, tenantId, {
       key: appointment.key,
       patientId: input.patients[appointment.patientKey].id,
@@ -1206,6 +1318,35 @@ function timeOnDate(year: number, monthDay: string, time: string) {
 
 function addMinutes(isoDate: string, minutes: number) {
   return new Date(new Date(isoDate).getTime() + minutes * 60_000).toISOString();
+}
+
+function startOfWeekMonday(date: Date) {
+  const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = value.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  value.setUTCDate(value.getUTCDate() + diff);
+  return value;
+}
+
+function addDays(date: Date, days: number) {
+  const value = new Date(date);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value;
+}
+
+function dateKey(date: Date) {
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function formatMonthDay(date: Date) {
+  return [
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
 }
 
 seedSmokeDemo()
