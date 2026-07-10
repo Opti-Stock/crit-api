@@ -3,9 +3,15 @@ import { Router } from "express";
 import { authenticateRequest } from "../../middlewares/auth.pipeline.js";
 import { requireRoles } from "../../middlewares/role.middleware.js";
 import { requireTenantContext } from "../../middlewares/tenant.middleware.js";
+import { createRateLimit } from "../../middlewares/rate-limit.middleware.js";
 import { CheckinController } from "./checkin.controller.js";
 
 const controller = new CheckinController();
+const scanRateLimit = createRateLimit({
+  keyPrefix: "checkin-scan",
+  windowMs: 60_000,
+  maxRequests: 90
+});
 
 export const checkinRouter = Router();
 
@@ -18,4 +24,4 @@ checkinRouter.use(
 checkinRouter.get("/appointments", controller.listAppointments);
 checkinRouter.get("/appointments/:appointmentId", controller.getAppointment);
 checkinRouter.post("/appointments/:appointmentId/check-in", controller.checkIn);
-checkinRouter.post("/scan", controller.scanCheckIn);
+checkinRouter.post("/scan", scanRateLimit, controller.scanCheckIn);
