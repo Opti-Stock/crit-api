@@ -32,4 +32,9 @@ test("an unrecognized role receives no attendance scope", () => {
     clinics: false,
     ownCollaborator: false
   });
+  assert.deepEqual(resolveScope(["recepcion_general"]), {
+    tenantWide: false,
+    clinics: false,
+    ownCollaborator: false
+  });
 });

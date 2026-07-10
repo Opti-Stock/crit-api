@@ -11,7 +11,16 @@ export const notificationsRouter = Router();
 notificationsRouter.use(
   authenticateRequest,
   requireTenantContext,
-  requireRoles("admin", "direccion", "recepcion", "coordinador", "medico", "terapeuta", "personal_acompanamiento")
+  requireRoles(
+    "admin",
+    "direccion",
+    "recepcion",
+    "recepcion_general",
+    "coordinador",
+    "medico",
+    "terapeuta",
+    "personal_acompanamiento"
+  )
 );
 notificationsRouter.get("/", controller.list);
 notificationsRouter.get("/:notificationId", controller.get);

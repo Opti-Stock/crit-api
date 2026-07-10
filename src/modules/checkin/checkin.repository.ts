@@ -353,7 +353,7 @@ export class CheckinRepository {
   }
 
   private isTenantWide(actorRoles: string[]) {
-    return actorRoles.some((role) => role === "admin" || role === "direccion");
+    return actorRoles.some((role) => role === "admin" || role === "direccion" || role === "recepcion_general");
   }
 
   private async resolveAccessibleClinicIds(client: PoolClient, tenantId: string, userId: string) {

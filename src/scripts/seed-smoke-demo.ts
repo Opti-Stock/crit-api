@@ -14,6 +14,7 @@ const DEMO_USERS = [
   { role: "admin", email: "demo.admin@crit.test", fullName: "Demo Admin" },
   { role: "direccion", email: "demo.direccion@crit.test", fullName: "Demo Direccion" },
   { role: "recepcion", email: "demo.recepcion@crit.test", fullName: "Demo Recepcion" },
+  { role: "recepcion_general", email: "demo.recepcion.general@crit.test", fullName: "Demo Recepcion General" },
   { role: "coordinador", email: "demo.coordinador@crit.test", fullName: "Demo Coordinador" },
   { role: "medico", email: "demo.medico@crit.test", fullName: "Demo Medico", specialty: "Medicina fisica" },
   { role: "terapeuta", email: "demo.terapeuta@crit.test", fullName: "Demo Terapeuta", specialty: "Terapia fisica" },

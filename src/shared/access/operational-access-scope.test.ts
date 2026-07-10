@@ -38,4 +38,9 @@ test("unknown roles receive no operational data scope", () => {
     clinics: false,
     ownCollaborator: false
   });
+  assert.deepEqual(resolveOperationalAccessScope(["recepcion_general"]), {
+    tenantWide: false,
+    clinics: false,
+    ownCollaborator: false
+  });
 });
