@@ -9,26 +9,422 @@ import { withTenantTransaction } from "../shared/db/tenant-transaction.js";
 
 const TENANT_CODE = process.env.DEMO_TENANT_CODE?.trim().toUpperCase() || "CRIT-OCC-01";
 const DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD || "DemoPassword123";
+const DEMO_YEAR = Number(process.env.DEMO_YEAR || "2026");
+
+const DEMO_CLINICS = [
+  {
+    key: "norte",
+    name: "Smoke Norte Medicina",
+    specialization: "Medicina fisica y rehabilitacion",
+    capacity: 6,
+    rooms: [
+      { key: "norte-consultorio-1", name: "Smoke Norte Consultorio 1", capacity: 1 },
+      { key: "norte-consultorio-2", name: "Smoke Norte Consultorio 2", capacity: 1 },
+      { key: "norte-sala-terapia", name: "Smoke Norte Sala Terapia", capacity: 4 }
+    ]
+  },
+  {
+    key: "sur",
+    name: "Smoke Sur Terapia",
+    specialization: "Terapia fisica y ocupacional",
+    capacity: 8,
+    rooms: [
+      { key: "sur-consultorio", name: "Smoke Sur Consultorio", capacity: 1 },
+      { key: "sur-terapia-a", name: "Smoke Sur Terapia A", capacity: 3 },
+      { key: "sur-terapia-b", name: "Smoke Sur Terapia B", capacity: 4 }
+    ]
+  },
+  {
+    key: "infantil",
+    name: "Smoke Infantil Lenguaje",
+    specialization: "Lenguaje y neurodesarrollo",
+    capacity: 5,
+    rooms: [
+      { key: "infantil-lenguaje", name: "Smoke Infantil Lenguaje", capacity: 2 },
+      { key: "infantil-estimulacion", name: "Smoke Infantil Estimulacion", capacity: 3 }
+    ]
+  }
+] as const;
 
 const DEMO_USERS = [
-  { role: "admin", email: "demo.admin@crit.test", fullName: "Demo Admin" },
-  { role: "direccion", email: "demo.direccion@crit.test", fullName: "Demo Direccion" },
-  { role: "recepcion", email: "demo.recepcion@crit.test", fullName: "Demo Recepcion" },
-  { role: "recepcion_general", email: "demo.recepcion.general@crit.test", fullName: "Demo Recepcion General" },
-  { role: "coordinador", email: "demo.coordinador@crit.test", fullName: "Demo Coordinador" },
-  { role: "medico", email: "demo.medico@crit.test", fullName: "Demo Medico", specialty: "Medicina fisica" },
-  { role: "terapeuta", email: "demo.terapeuta@crit.test", fullName: "Demo Terapeuta", specialty: "Terapia fisica" },
+  { key: "admin", role: "admin", email: "demo.admin@crit.test", fullName: "Demo Admin General", clinicKeys: ["all"] },
+  { key: "direccion", role: "direccion", email: "demo.direccion@crit.test", fullName: "Demo Direccion Todas Clinicas", clinicKeys: ["all"] },
   {
+    key: "recepcion_general",
+    role: "recepcion_general",
+    email: "demo.recepcion.general@crit.test",
+    fullName: "Demo Recepcion General Checkin Global",
+    clinicKeys: ["all"]
+  },
+  {
+    key: "recepcion_norte",
+    role: "recepcion",
+    email: "demo.recepcion.norte@crit.test",
+    fullName: "Demo Recepcion Norte",
+    clinicKeys: ["norte"]
+  },
+  {
+    key: "recepcion_sur",
+    role: "recepcion",
+    email: "demo.recepcion.sur@crit.test",
+    fullName: "Demo Recepcion Sur",
+    clinicKeys: ["sur"]
+  },
+  {
+    key: "recepcion_infantil",
+    role: "recepcion",
+    email: "demo.recepcion.infantil@crit.test",
+    fullName: "Demo Recepcion Infantil",
+    clinicKeys: ["infantil"]
+  },
+  {
+    key: "coordinador_norte",
+    role: "coordinador",
+    email: "demo.coordinador.norte@crit.test",
+    fullName: "Demo Coordinador Norte",
+    specialty: "Coordinacion medicina fisica",
+    clinicKeys: ["norte"]
+  },
+  {
+    key: "coordinador_sur",
+    role: "coordinador",
+    email: "demo.coordinador.sur@crit.test",
+    fullName: "Demo Coordinador Sur",
+    specialty: "Coordinacion terapia fisica",
+    clinicKeys: ["sur"]
+  },
+  {
+    key: "medico_norte",
+    role: "medico",
+    email: "demo.medico.norte@crit.test",
+    fullName: "Demo Medico Norte",
+    specialty: "Medicina fisica norte",
+    clinicKeys: ["norte"]
+  },
+  {
+    key: "medico_multi",
+    role: "medico",
+    email: "demo.medico.multi@crit.test",
+    fullName: "Demo Medico Multi Clinica",
+    specialty: "Medicina fisica multi clinica",
+    clinicKeys: ["norte", "sur", "infantil"]
+  },
+  {
+    key: "terapeuta_sur",
+    role: "terapeuta",
+    email: "demo.terapeuta.sur@crit.test",
+    fullName: "Demo Terapeuta Sur",
+    specialty: "Terapia fisica sur",
+    clinicKeys: ["sur"]
+  },
+  {
+    key: "terapeuta_infantil",
+    role: "terapeuta",
+    email: "demo.terapeuta.infantil@crit.test",
+    fullName: "Demo Terapeuta Infantil",
+    specialty: "Terapia lenguaje infantil",
+    clinicKeys: ["infantil"]
+  },
+  {
+    key: "acompanamiento_norte",
+    role: "personal_acompanamiento",
+    email: "demo.acompanamiento.norte@crit.test",
+    fullName: "Demo AP Norte",
+    specialty: "Acompanamiento norte",
+    clinicKeys: ["norte"]
+  },
+  {
+    key: "acompanamiento_sur",
+    role: "personal_acompanamiento",
+    email: "demo.acompanamiento.sur@crit.test",
+    fullName: "Demo AP Sur",
+    specialty: "Acompanamiento sur",
+    clinicKeys: ["sur"]
+  },
+  {
+    key: "familia",
+    role: "paciente_familia",
+    email: "demo.familia@crit.test",
+    fullName: "Demo Familia Paciente Norte",
+    clinicKeys: []
+  },
+  // Backward-compatible aliases used by earlier smoke docs.
+  { key: "recepcion_legacy", role: "recepcion", email: "demo.recepcion@crit.test", fullName: "Demo Recepcion Legacy Norte", clinicKeys: ["norte"] },
+  {
+    key: "coordinador_legacy",
+    role: "coordinador",
+    email: "demo.coordinador@crit.test",
+    fullName: "Demo Coordinador Legacy Norte",
+    specialty: "Coordinacion legacy",
+    clinicKeys: ["norte"]
+  },
+  {
+    key: "medico_legacy",
+    role: "medico",
+    email: "demo.medico@crit.test",
+    fullName: "Demo Medico Legacy Norte",
+    specialty: "Medicina fisica legacy",
+    clinicKeys: ["norte"]
+  },
+  {
+    key: "terapeuta_legacy",
+    role: "terapeuta",
+    email: "demo.terapeuta@crit.test",
+    fullName: "Demo Terapeuta Legacy Sur",
+    specialty: "Terapia fisica legacy",
+    clinicKeys: ["sur"]
+  },
+  {
+    key: "acompanamiento_legacy",
     role: "personal_acompanamiento",
     email: "demo.acompanamiento@crit.test",
-    fullName: "Demo Acompanamiento",
-    specialty: "Acompanamiento"
-  },
-  { role: "paciente_familia", email: "demo.familia@crit.test", fullName: "Demo Familia" }
+    fullName: "Demo Acompanamiento Legacy",
+    specialty: "Acompanamiento legacy",
+    clinicKeys: ["norte"]
+  }
 ] as const;
+
+const DEMO_PATIENTS = [
+  {
+    key: "norte_asiste",
+    externalId: "DEMO-PAT-NORTE-001",
+    fullName: "Paciente Smoke Norte Asistencia",
+    birthDate: "2014-05-10",
+    phone: "5550101001",
+    email: "paciente.norte.asistencia@crit.test",
+    disability: "Motora",
+    gender: "No especificado"
+  },
+  {
+    key: "norte_falta",
+    externalId: "DEMO-PAT-NORTE-002",
+    fullName: "Paciente Smoke Norte Inasistencia",
+    birthDate: "2012-09-18",
+    phone: "5550101002",
+    email: "paciente.norte.inasistencia@crit.test",
+    disability: "Neuromuscular",
+    gender: "No especificado"
+  },
+  {
+    key: "sur_checkin",
+    externalId: "DEMO-PAT-SUR-001",
+    fullName: "Paciente Smoke Sur Checkin Pendiente Asistencia",
+    birthDate: "2015-03-12",
+    phone: "5550101003",
+    email: "paciente.sur.checkin@crit.test",
+    disability: "Motora",
+    gender: "No especificado"
+  },
+  {
+    key: "sur_reagenda",
+    externalId: "DEMO-PAT-SUR-002",
+    fullName: "Paciente Smoke Sur Solicitud Reagendar",
+    birthDate: "2011-11-08",
+    phone: "5550101004",
+    email: "paciente.sur.reagenda@crit.test",
+    disability: "Visual",
+    gender: "No especificado"
+  },
+  {
+    key: "infantil_lenguaje",
+    externalId: "DEMO-PAT-INF-001",
+    fullName: "Paciente Smoke Infantil Lenguaje",
+    birthDate: "2017-02-20",
+    phone: "5550101005",
+    email: "paciente.infantil.lenguaje@crit.test",
+    disability: "Lenguaje",
+    gender: "No especificado"
+  },
+  {
+    key: "infantil_futuro",
+    externalId: "DEMO-PAT-INF-002",
+    fullName: "Paciente Smoke Infantil Futuro",
+    birthDate: "2018-07-01",
+    phone: "5550101006",
+    email: "paciente.infantil.futuro@crit.test",
+    disability: "Neurodesarrollo",
+    gender: "No especificado"
+  },
+  {
+    key: "cancelada",
+    externalId: "DEMO-PAT-CAN-001",
+    fullName: "Paciente Smoke Cita Cancelada",
+    birthDate: "2013-12-02",
+    phone: "5550101007",
+    email: "paciente.cancelada@crit.test",
+    disability: "Auditiva",
+    gender: "No especificado"
+  },
+  {
+    key: "sin_citas",
+    externalId: "DEMO-PAT-SIN-001",
+    fullName: "Paciente Smoke Valido Sin Citas",
+    birthDate: "2016-10-15",
+    phone: "5550101008",
+    email: "paciente.sin.citas@crit.test",
+    disability: "Motora",
+    gender: "No especificado"
+  }
+] as const;
+
+const DEMO_APPOINTMENT_TYPES = [
+  { key: "medicina", name: "Smoke Medicina Fisica", duration: 45 },
+  { key: "terapia_fisica", name: "Smoke Terapia Fisica", duration: 50 },
+  { key: "lenguaje", name: "Smoke Terapia Lenguaje", duration: 40 },
+  { key: "valoracion", name: "Smoke Valoracion Inicial", duration: 60 }
+] as const;
+
+const DEMO_APPOINTMENTS = [
+  {
+    key: "junio_presente_norte",
+    patientKey: "norte_asiste",
+    userKey: "medico_norte",
+    clinicKey: "norte",
+    roomKey: "norte-consultorio-1",
+    typeKey: "medicina",
+    date: "06-03",
+    time: "09:00",
+    duration: 45,
+    status: "scheduled",
+    checkIn: true,
+    attendance: "present",
+    medicalNote: true,
+    handoff: true
+  },
+  {
+    key: "junio_falta_norte",
+    patientKey: "norte_falta",
+    userKey: "medico_multi",
+    clinicKey: "norte",
+    roomKey: "norte-consultorio-2",
+    typeKey: "valoracion",
+    date: "06-10",
+    time: "10:30",
+    duration: 60,
+    status: "scheduled",
+    checkIn: false,
+    attendance: "absent",
+    medicalNote: false,
+    handoff: true
+  },
+  {
+    key: "junio_cancelada_sur",
+    patientKey: "cancelada",
+    userKey: "terapeuta_sur",
+    clinicKey: "sur",
+    roomKey: "sur-terapia-a",
+    typeKey: "terapia_fisica",
+    date: "06-18",
+    time: "12:00",
+    duration: 50,
+    status: "cancelled",
+    checkIn: false
+  },
+  {
+    key: "julio_checkin_sur",
+    patientKey: "sur_checkin",
+    userKey: "terapeuta_sur",
+    clinicKey: "sur",
+    roomKey: "sur-terapia-a",
+    typeKey: "terapia_fisica",
+    date: "07-10",
+    time: "09:00",
+    duration: 50,
+    status: "scheduled",
+    checkIn: true
+  },
+  {
+    key: "julio_reagendar_sur",
+    patientKey: "sur_reagenda",
+    userKey: "terapeuta_sur",
+    clinicKey: "sur",
+    roomKey: "sur-terapia-b",
+    typeKey: "terapia_fisica",
+    date: "07-10",
+    time: "11:00",
+    duration: 50,
+    status: "rescheduled",
+    checkIn: true,
+    attendance: "rescheduled",
+    handoff: true
+  },
+  {
+    key: "julio_lenguaje_infantil",
+    patientKey: "infantil_lenguaje",
+    userKey: "terapeuta_infantil",
+    clinicKey: "infantil",
+    roomKey: "infantil-lenguaje",
+    typeKey: "lenguaje",
+    date: "07-16",
+    time: "13:00",
+    duration: 40,
+    status: "scheduled",
+    checkIn: false
+  },
+  {
+    key: "julio_multi_medico",
+    patientKey: "norte_asiste",
+    userKey: "medico_multi",
+    clinicKey: "infantil",
+    roomKey: "infantil-estimulacion",
+    typeKey: "valoracion",
+    date: "07-22",
+    time: "08:30",
+    duration: 60,
+    status: "scheduled",
+    checkIn: false,
+    medicalNote: false
+  },
+  {
+    key: "agosto_futuro_infantil",
+    patientKey: "infantil_futuro",
+    userKey: "terapeuta_infantil",
+    clinicKey: "infantil",
+    roomKey: "infantil-lenguaje",
+    typeKey: "lenguaje",
+    date: "08-05",
+    time: "09:30",
+    duration: 40,
+    status: "scheduled",
+    checkIn: false
+  },
+  {
+    key: "agosto_futuro_norte",
+    patientKey: "norte_falta",
+    userKey: "medico_norte",
+    clinicKey: "norte",
+    roomKey: "norte-consultorio-1",
+    typeKey: "medicina",
+    date: "08-14",
+    time: "10:00",
+    duration: 45,
+    status: "scheduled",
+    checkIn: false
+  },
+  {
+    key: "agosto_reprogramada_sur",
+    patientKey: "sur_reagenda",
+    userKey: "medico_multi",
+    clinicKey: "sur",
+    roomKey: "sur-consultorio",
+    typeKey: "valoracion",
+    date: "08-28",
+    time: "12:30",
+    duration: 60,
+    status: "rescheduled",
+    checkIn: false
+  }
+] as const;
+
+type DemoUserKey = (typeof DEMO_USERS)[number]["key"];
+type DemoClinicKey = (typeof DEMO_CLINICS)[number]["key"];
+type DemoRoomKey = (typeof DEMO_CLINICS)[number]["rooms"][number]["key"];
+type DemoPatientKey = (typeof DEMO_PATIENTS)[number]["key"];
+type DemoAppointmentTypeKey = (typeof DEMO_APPOINTMENT_TYPES)[number]["key"];
 
 interface DemoUser {
   id: string;
+  key: string;
   role: string;
   email: string;
   fullName: string;
@@ -37,19 +433,25 @@ interface DemoUser {
 
 interface DemoClinic {
   id: string;
+  key: string;
+  name: string;
 }
 
 interface DemoRoom {
   id: string;
+  key: string;
+  clinicKey: string;
 }
 
 interface DemoPatient {
   id: string;
+  key: string;
   fullName: string;
 }
 
 interface DemoAppointment {
   id: string;
+  key: string;
   patientId: string;
   collaboratorId: string;
 }
@@ -73,89 +475,102 @@ async function seedSmokeDemo() {
 
   const summary = await withTenantTransaction({ tenantId }, async (client) => {
     const roleIds = await loadRoleIds(client, tenantId);
-    const clinic = await upsertClinic(client, tenantId);
-    const rooms = {
-      consultorio: await upsertRoom(client, tenantId, clinic.id, "Consultorio Demo", 2),
-      terapia: await upsertRoom(client, tenantId, clinic.id, "Sala Terapia Demo", 4)
-    };
-    const users = await upsertUsers(client, tenantId, roleIds, clinic.id, passwordHash);
-    const patients = {
-      therapy: await upsertPatient(client, tenantId, {
-        externalId: "DEMO-PAT-001",
-        fullName: "Paciente Demo Terapia",
-        birthDate: "2014-05-10",
-        phone: "5550101001",
-        email: "paciente.terapia@crit.test",
-        disability: "Motora",
-        gender: "No especificado"
-      }),
-      medical: await upsertPatient(client, tenantId, {
-        externalId: "DEMO-PAT-002",
-        fullName: "Paciente Demo Medicina",
-        birthDate: "2012-09-18",
-        phone: "5550101002",
-        email: "paciente.medicina@crit.test",
-        disability: "Neuromuscular",
-        gender: "No especificado"
-      }),
-      handoff: await upsertPatient(client, tenantId, {
-        externalId: "DEMO-PAT-003",
-        fullName: "Paciente Demo Enlace",
-        birthDate: "2016-01-25",
-        phone: "5550101003",
-        email: "paciente.enlace@crit.test",
-        disability: "Lenguaje",
-        gender: "No especificado"
-      })
-    };
+    const clinics = await upsertClinics(client, tenantId);
+    const rooms = await upsertRooms(client, tenantId, clinics);
+    const users = await upsertUsers(client, tenantId, roleIds, clinics, passwordHash);
+    const patients = await upsertPatients(client, tenantId);
+    const appointmentTypes = await upsertAppointmentTypes(client, tenantId);
 
-    await linkFamilyUserToPatient(client, tenantId, users.paciente_familia.id, patients.therapy.id);
+    await linkFamilyUserToPatient(client, tenantId, users.familia.id, patients.norte_asiste.id);
 
-    const appointmentType = await upsertAppointmentType(client, tenantId);
     const appointments = await upsertAppointments(client, tenantId, {
-      actorUserId: users.coordinador.id,
-      clinic,
+      actorUserId: users.coordinador_norte.id,
+      clinics,
       rooms,
-      appointmentTypeId: appointmentType.id,
+      appointmentTypes,
       patients,
-      medicoCollaboratorId: requireCollaborator(users.medico),
-      terapeutaCollaboratorId: requireCollaborator(users.terapeuta)
+      users
     });
 
-    await upsertCheckIn(client, tenantId, appointments.present, users.recepcion.id);
-    const attendance = await upsertAttendance(client, tenantId, appointments.present, users.terapeuta.id, "present", true);
-    await upsertAttendance(client, tenantId, appointments.absent, users.medico.id, "absent", false);
-    await upsertAttendance(client, tenantId, appointments.rescheduled, users.terapeuta.id, "rescheduled", false);
+    const attendanceRecords: DemoAppointment[] = [];
+    for (const appointmentConfig of DEMO_APPOINTMENTS) {
+      const appointment = appointments[appointmentConfig.key];
+      if (appointmentConfig.checkIn) {
+        await upsertCheckIn(client, tenantId, appointment, users.recepcion_general.id);
+      }
+      const attendanceStatus = "attendance" in appointmentConfig ? appointmentConfig.attendance : undefined;
+      const requiresMedicalNote = "medicalNote" in appointmentConfig && appointmentConfig.medicalNote === true;
+      if (attendanceStatus) {
+        await upsertAttendance(
+          client,
+          tenantId,
+          appointment,
+          users[appointmentConfig.userKey].id,
+          attendanceStatus,
+          requiresMedicalNote
+        );
+        attendanceRecords.push(appointment);
+      }
+    }
 
-    await setCurrentUser(client, users.terapeuta.id);
-    await upsertMedicalNote(client, tenantId, appointments.present, attendance.id, users.terapeuta.id);
+    for (const appointmentConfig of DEMO_APPOINTMENTS.filter((appointment) => "medicalNote" in appointment && appointment.medicalNote)) {
+      const appointment = appointments[appointmentConfig.key];
+      const attendanceStatus = "attendance" in appointmentConfig ? appointmentConfig.attendance : "present";
+      const attendance = await upsertAttendance(
+        client,
+        tenantId,
+        appointment,
+        users[appointmentConfig.userKey].id,
+        attendanceStatus,
+        true
+      );
+      await setCurrentUser(client, users[appointmentConfig.userKey].id);
+      await upsertMedicalNote(client, tenantId, appointment, attendance.id, users[appointmentConfig.userKey].id, appointmentConfig.key);
+    }
 
-    await setCurrentUser(client, users.personal_acompanamiento.id);
-    const handoffNote = await upsertHandoffNote(client, tenantId, {
-      appointmentId: appointments.present.id,
-      patientId: patients.therapy.id,
-      createdByUserId: users.personal_acompanamiento.id,
-      recipientUserIds: [
-        users.recepcion.id,
-        users.coordinador.id,
-        users.medico.id,
-        users.terapeuta.id,
-        users.direccion.id
-      ]
-    });
+    const handoffRecipients = [
+      users.recepcion_norte.id,
+      users.recepcion_sur.id,
+      users.recepcion_general.id,
+      users.coordinador_norte.id,
+      users.coordinador_sur.id,
+      users.medico_norte.id,
+      users.medico_multi.id,
+      users.terapeuta_sur.id,
+      users.terapeuta_infantil.id,
+      users.direccion.id
+    ];
 
-    await upsertNotification(client, tenantId, users.terapeuta.id, {
+    for (const appointmentConfig of DEMO_APPOINTMENTS.filter((appointment) => "handoff" in appointment && appointment.handoff)) {
+      await setCurrentUser(client, users.acompanamiento_norte.id);
+      await upsertHandoffNote(client, tenantId, {
+        appointment: appointments[appointmentConfig.key],
+        title: `Smoke enlace ${appointmentConfig.key}`,
+        createdByUserId: users.acompanamiento_norte.id,
+        recipientUserIds: handoffRecipients
+      });
+    }
+
+    await upsertNotification(client, tenantId, users.terapeuta_sur.id, {
       type: "pending_note",
-      title: "Demo: nota medica revisada",
-      message: "Notificacion demo para validar el centro de notificaciones."
+      title: "Smoke: nota medica pendiente",
+      message: "Notificacion demo para validar contador de terapeuta."
+    });
+    await upsertNotification(client, tenantId, users.recepcion_general.id, {
+      type: "appointment_change",
+      title: "Smoke: solicitud de reagendar",
+      message: "Notificacion demo para recepcion general."
     });
 
     return {
       tenant: tenant.rows[0]!.code,
       users: Object.values(users).length,
+      clinics: Object.values(clinics).length,
+      rooms: Object.values(rooms).length,
       patients: Object.values(patients).length,
+      appointmentTypes: Object.values(appointmentTypes).length,
       appointments: Object.values(appointments).length,
-      handoffNoteId: handoffNote.id
+      attendanceRecords: attendanceRecords.length
     };
   }, pool);
 
@@ -170,61 +585,96 @@ async function loadRoleIds(client: PoolClient, tenantId: string) {
     [tenantId]
   );
   const roleIds = new Map(result.rows.map((row) => [row.name, row.id]));
-  const missingRoles = DEMO_USERS.map((user) => user.role).filter((role) => !roleIds.has(role));
+  const requiredRoles = [...new Set(DEMO_USERS.map((user) => user.role))];
+  const missingRoles = requiredRoles.filter((role) => !roleIds.has(role));
   if (missingRoles.length) throw new Error(`Missing seeded roles: ${missingRoles.join(", ")}`);
   return roleIds;
 }
 
-async function upsertClinic(client: PoolClient, tenantId: string): Promise<DemoClinic> {
-  const existing = await client.query<{ id: string }>(
-    `SELECT id FROM clinics
-     WHERE tenant_id = $1 AND lower(name) = lower($2) AND deleted_at IS NULL
-     LIMIT 1`,
-    [tenantId, "Clinica Demo Smoke"]
-  );
-  if (existing.rows[0]) return existing.rows[0];
+async function upsertClinics(client: PoolClient, tenantId: string) {
+  const clinics: Record<DemoClinicKey, DemoClinic> = {} as Record<DemoClinicKey, DemoClinic>;
 
-  const inserted = await client.query<{ id: string }>(
-    `INSERT INTO clinics (tenant_id, name, specialization, capacity)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id`,
-    [tenantId, "Clinica Demo Smoke", "Rehabilitacion integral", 6]
-  );
-  return inserted.rows[0]!;
+  for (const clinic of DEMO_CLINICS) {
+    const existing = await client.query<{ id: string }>(
+      `SELECT id FROM clinics
+       WHERE tenant_id = $1 AND lower(name) = lower($2) AND deleted_at IS NULL
+       LIMIT 1`,
+      [tenantId, clinic.name]
+    );
+    const id = existing.rows[0]?.id ?? (
+      await client.query<{ id: string }>(
+        `INSERT INTO clinics (tenant_id, name, specialization, capacity)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [tenantId, clinic.name, clinic.specialization, clinic.capacity]
+      )
+    ).rows[0]!.id;
+
+    await client.query(
+      `UPDATE clinics
+       SET specialization = $3,
+           capacity = $4,
+           status = 'active',
+           deleted_at = NULL
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, id, clinic.specialization, clinic.capacity]
+    );
+
+    clinics[clinic.key] = { id, key: clinic.key, name: clinic.name };
+  }
+
+  return clinics;
 }
 
-async function upsertRoom(
+async function upsertRooms(
   client: PoolClient,
   tenantId: string,
-  clinicId: string,
-  name: string,
-  capacity: number
-): Promise<DemoRoom> {
-  const existing = await client.query<{ id: string }>(
-    `SELECT id FROM rooms
-     WHERE tenant_id = $1 AND clinic_id = $2 AND lower(name) = lower($3) AND deleted_at IS NULL
-     LIMIT 1`,
-    [tenantId, clinicId, name]
-  );
-  if (existing.rows[0]) return existing.rows[0];
+  clinics: Record<DemoClinicKey, DemoClinic>
+) {
+  const rooms: Record<DemoRoomKey, DemoRoom> = {} as Record<DemoRoomKey, DemoRoom>;
 
-  const inserted = await client.query<{ id: string }>(
-    `INSERT INTO rooms (tenant_id, clinic_id, name, capacity)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id`,
-    [tenantId, clinicId, name, capacity]
-  );
-  return inserted.rows[0]!;
+  for (const clinic of DEMO_CLINICS) {
+    for (const room of clinic.rooms) {
+      const clinicId = clinics[clinic.key].id;
+      const existing = await client.query<{ id: string }>(
+        `SELECT id FROM rooms
+         WHERE tenant_id = $1 AND clinic_id = $2 AND lower(name) = lower($3) AND deleted_at IS NULL
+         LIMIT 1`,
+        [tenantId, clinicId, room.name]
+      );
+      const id = existing.rows[0]?.id ?? (
+        await client.query<{ id: string }>(
+          `INSERT INTO rooms (tenant_id, clinic_id, name, capacity)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id`,
+          [tenantId, clinicId, room.name, room.capacity]
+        )
+      ).rows[0]!.id;
+
+      await client.query(
+        `UPDATE rooms
+         SET capacity = $4,
+             status = 'active',
+             deleted_at = NULL
+         WHERE tenant_id = $1 AND id = $2 AND clinic_id = $3`,
+        [tenantId, id, clinicId, room.capacity]
+      );
+
+      rooms[room.key] = { id, key: room.key, clinicKey: clinic.key };
+    }
+  }
+
+  return rooms;
 }
 
 async function upsertUsers(
   client: PoolClient,
   tenantId: string,
   roleIds: Map<string, string>,
-  clinicId: string,
+  clinics: Record<DemoClinicKey, DemoClinic>,
   passwordHash: string
 ) {
-  const users: Record<string, DemoUser> = {};
+  const users: Record<DemoUserKey, DemoUser> = {} as Record<DemoUserKey, DemoUser>;
 
   for (const demoUser of DEMO_USERS) {
     const user = await upsertUser(client, tenantId, {
@@ -240,32 +690,42 @@ async function upsertUsers(
       [tenantId, user.id, roleId]
     );
 
-    if (demoUser.role !== "paciente_familia") {
+    const clinicKeys = (demoUser.clinicKeys as readonly string[]).includes("all")
+      ? DEMO_CLINICS.map((clinic) => clinic.key)
+      : demoUser.clinicKeys.filter((clinicKey): clinicKey is DemoClinicKey => clinicKey !== "all");
+
+    for (const clinicKey of clinicKeys) {
+      const clinicId = clinics[clinicKey].id;
       await client.query(
         `INSERT INTO user_clinic_access (tenant_id, user_id, clinic_id, access_level)
          VALUES ($1, $2, $3, 'standard')
          ON CONFLICT (tenant_id, user_id, clinic_id) DO NOTHING`,
         [tenantId, user.id, clinicId]
       );
+    }
+
+    if (demoUser.role !== "paciente_familia") {
       const collaborator = await upsertCollaborator(client, tenantId, user.id, {
         fullName: demoUser.fullName,
         email: demoUser.email,
         specialty: "specialty" in demoUser && demoUser.specialty ? demoUser.specialty : demoUser.role,
         position: demoUser.role
       });
-      await client.query(
-        `INSERT INTO collaborator_clinics (tenant_id, collaborator_id, clinic_id)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (tenant_id, collaborator_id, clinic_id) DO NOTHING`,
-        [tenantId, collaborator.id, clinicId]
-      );
-      users[demoUser.role] = { ...user, role: demoUser.role, collaboratorId: collaborator.id };
+      for (const clinicKey of clinicKeys) {
+        await client.query(
+          `INSERT INTO collaborator_clinics (tenant_id, collaborator_id, clinic_id)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (tenant_id, collaborator_id, clinic_id) DO NOTHING`,
+          [tenantId, collaborator.id, clinics[clinicKey].id]
+        );
+      }
+      users[demoUser.key] = { ...user, key: demoUser.key, role: demoUser.role, collaboratorId: collaborator.id };
     } else {
-      users[demoUser.role] = { ...user, role: demoUser.role };
+      users[demoUser.key] = { ...user, key: demoUser.key, role: demoUser.role };
     }
   }
 
-  return users as Record<(typeof DEMO_USERS)[number]["role"], DemoUser>;
+  return users;
 }
 
 async function upsertUser(
@@ -274,8 +734,8 @@ async function upsertUser(
   input: { fullName: string; email: string; passwordHash: string }
 ) {
   const email = input.email.toLowerCase();
-  const existing = await client.query<{ id: string; full_name: string; email: string }>(
-    `SELECT id, full_name, email FROM users
+  const existing = await client.query<{ id: string }>(
+    `SELECT id FROM users
      WHERE tenant_id = $1 AND lower(email) = $2 AND deleted_at IS NULL
      LIMIT 1`,
     [tenantId, email]
@@ -323,18 +783,18 @@ async function upsertCollaborator(
   return result.rows[0]!;
 }
 
+async function upsertPatients(client: PoolClient, tenantId: string) {
+  const patients: Record<DemoPatientKey, DemoPatient> = {} as Record<DemoPatientKey, DemoPatient>;
+  for (const patient of DEMO_PATIENTS) {
+    patients[patient.key] = await upsertPatient(client, tenantId, patient);
+  }
+  return patients;
+}
+
 async function upsertPatient(
   client: PoolClient,
   tenantId: string,
-  input: {
-    externalId: string;
-    fullName: string;
-    birthDate: string;
-    phone: string;
-    email: string;
-    disability: string;
-    gender: string;
-  }
+  input: (typeof DEMO_PATIENTS)[number]
 ): Promise<DemoPatient> {
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM patients
@@ -364,7 +824,7 @@ async function upsertPatient(
         input.gender
       ]
     );
-    return { id: existing.rows[0].id, fullName: input.fullName };
+    return { id: existing.rows[0].id, key: input.key, fullName: input.fullName };
   }
 
   const inserted = await client.query<{ id: string }>(
@@ -382,7 +842,7 @@ async function upsertPatient(
       input.gender
     ]
   );
-  return { id: inserted.rows[0]!.id, fullName: input.fullName };
+  return { id: inserted.rows[0]!.id, key: input.key, fullName: input.fullName };
 }
 
 async function linkFamilyUserToPatient(
@@ -399,21 +859,40 @@ async function linkFamilyUserToPatient(
   );
 }
 
-async function upsertAppointmentType(client: PoolClient, tenantId: string) {
+async function upsertAppointmentTypes(client: PoolClient, tenantId: string) {
+  const appointmentTypes: Record<DemoAppointmentTypeKey, { id: string }> = {} as Record<DemoAppointmentTypeKey, { id: string }>;
+  for (const type of DEMO_APPOINTMENT_TYPES) {
+    appointmentTypes[type.key] = await upsertAppointmentType(client, tenantId, type.name, type.duration);
+  }
+  return appointmentTypes;
+}
+
+async function upsertAppointmentType(client: PoolClient, tenantId: string, name: string, duration: number) {
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM appointment_types
      WHERE tenant_id = $1 AND lower(name) = lower($2) AND deleted_at IS NULL
      LIMIT 1`,
-    [tenantId, "Terapia Demo"]
+    [tenantId, name]
   );
-  if (existing.rows[0]) return existing.rows[0];
+  if (existing.rows[0]) {
+    await client.query(
+      `UPDATE appointment_types
+       SET default_duration_minutes = $3,
+           default_pre_session_minutes = 5,
+           default_post_session_minutes = 5,
+           deleted_at = NULL
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, existing.rows[0].id, duration]
+    );
+    return existing.rows[0];
+  }
 
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO appointment_types (
        tenant_id, name, default_duration_minutes, default_pre_session_minutes, default_post_session_minutes
-     ) VALUES ($1, $2, 45, 5, 5)
+     ) VALUES ($1, $2, $3, 5, 5)
      RETURNING id`,
-    [tenantId, "Terapia Demo"]
+    [tenantId, name, duration]
   );
   return inserted.rows[0]!;
 }
@@ -423,58 +902,38 @@ async function upsertAppointments(
   tenantId: string,
   input: {
     actorUserId: string;
-    clinic: DemoClinic;
-    rooms: { consultorio: DemoRoom; terapia: DemoRoom };
-    appointmentTypeId: string;
-    patients: { therapy: DemoPatient; medical: DemoPatient; handoff: DemoPatient };
-    medicoCollaboratorId: string;
-    terapeutaCollaboratorId: string;
+    clinics: Record<DemoClinicKey, DemoClinic>;
+    rooms: Record<DemoRoomKey, DemoRoom>;
+    appointmentTypes: Record<DemoAppointmentTypeKey, { id: string }>;
+    patients: Record<DemoPatientKey, DemoPatient>;
+    users: Record<DemoUserKey, DemoUser>;
   }
 ) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const appointments: Record<string, DemoAppointment> = {};
 
-  return {
-    present: await upsertAppointment(client, tenantId, {
-      patientId: input.patients.therapy.id,
-      collaboratorId: input.terapeutaCollaboratorId,
-      clinicId: input.clinic.id,
-      roomId: input.rooms.terapia.id,
-      appointmentTypeId: input.appointmentTypeId,
-      startsAt: timeOnDate(today, 9, 0),
-      endsAt: timeOnDate(today, 9, 45),
-      status: "scheduled",
+  for (const appointment of DEMO_APPOINTMENTS) {
+    appointments[appointment.key] = await upsertAppointment(client, tenantId, {
+      key: appointment.key,
+      patientId: input.patients[appointment.patientKey].id,
+      collaboratorId: requireCollaborator(input.users[appointment.userKey]),
+      clinicId: input.clinics[appointment.clinicKey].id,
+      roomId: input.rooms[appointment.roomKey].id,
+      appointmentTypeId: input.appointmentTypes[appointment.typeKey].id,
+      startsAt: timeOnDate(DEMO_YEAR, appointment.date, appointment.time),
+      endsAt: addMinutes(timeOnDate(DEMO_YEAR, appointment.date, appointment.time), appointment.duration),
+      status: appointment.status,
       actorUserId: input.actorUserId
-    }),
-    absent: await upsertAppointment(client, tenantId, {
-      patientId: input.patients.medical.id,
-      collaboratorId: input.medicoCollaboratorId,
-      clinicId: input.clinic.id,
-      roomId: input.rooms.consultorio.id,
-      appointmentTypeId: input.appointmentTypeId,
-      startsAt: timeOnDate(today, 10, 0),
-      endsAt: timeOnDate(today, 10, 45),
-      status: "scheduled",
-      actorUserId: input.actorUserId
-    }),
-    rescheduled: await upsertAppointment(client, tenantId, {
-      patientId: input.patients.handoff.id,
-      collaboratorId: input.terapeutaCollaboratorId,
-      clinicId: input.clinic.id,
-      roomId: input.rooms.terapia.id,
-      appointmentTypeId: input.appointmentTypeId,
-      startsAt: timeOnDate(today, 11, 0),
-      endsAt: timeOnDate(today, 11, 45),
-      status: "rescheduled",
-      actorUserId: input.actorUserId
-    })
-  };
+    });
+  }
+
+  return appointments;
 }
 
 async function upsertAppointment(
   client: PoolClient,
   tenantId: string,
   input: {
+    key: string;
     patientId: string;
     collaboratorId: string;
     clinicId: string;
@@ -482,7 +941,7 @@ async function upsertAppointment(
     appointmentTypeId: string;
     startsAt: string;
     endsAt: string;
-    status: "scheduled" | "rescheduled";
+    status: "scheduled" | "rescheduled" | "cancelled";
     actorUserId: string;
   }
 ): Promise<DemoAppointment> {
@@ -517,7 +976,7 @@ async function upsertAppointment(
         input.actorUserId
       ]
     );
-    return { id: existing.rows[0].id, patientId: input.patientId, collaboratorId: input.collaboratorId };
+    return { id: existing.rows[0].id, key: input.key, patientId: input.patientId, collaboratorId: input.collaboratorId };
   }
 
   const inserted = await client.query<{ id: string }>(
@@ -539,7 +998,7 @@ async function upsertAppointment(
       input.actorUserId
     ]
   );
-  return { id: inserted.rows[0]!.id, patientId: input.patientId, collaboratorId: input.collaboratorId };
+  return { id: inserted.rows[0]!.id, key: input.key, patientId: input.patientId, collaboratorId: input.collaboratorId };
 }
 
 async function upsertCheckIn(
@@ -596,13 +1055,14 @@ async function upsertMedicalNote(
   tenantId: string,
   appointment: DemoAppointment,
   attendanceRecordId: string,
-  createdByUserId: string
+  createdByUserId: string,
+  label: string
 ) {
   await client.query(
     `INSERT INTO medical_notes (
        tenant_id, attendance_record_id, appointment_id, patient_id, collaborator_id,
        content, format_version, created_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'demo-medical-note.v1', $7)
+     ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'demo-medical-note.v2', $7)
      ON CONFLICT (tenant_id, appointment_id) DO UPDATE
      SET attendance_record_id = EXCLUDED.attendance_record_id,
          content = EXCLUDED.content,
@@ -616,8 +1076,8 @@ async function upsertMedicalNote(
       appointment.patientId,
       appointment.collaboratorId,
       JSON.stringify({
-        summary: "Paciente demo asistio a sesion. Se registra tolerancia adecuada al ejercicio.",
-        instructions: "Continuar rutina domiciliaria y seguimiento semanal.",
+        summary: `Nota medica smoke para ${label}.`,
+        instructions: "Validar vista tipo chat, edicion y lectura por rol.",
         observations: "Datos de prueba sin contenido clinico real."
       }),
       createdByUserId
@@ -629,13 +1089,12 @@ async function upsertHandoffNote(
   client: PoolClient,
   tenantId: string,
   input: {
-    appointmentId: string;
-    patientId: string;
+    appointment: DemoAppointment;
+    title: string;
     createdByUserId: string;
     recipientUserIds: string[];
   }
 ) {
-  const title = "Demo: seguimiento operativo";
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM handoff_notes
      WHERE tenant_id = $1
@@ -643,7 +1102,7 @@ async function upsertHandoffNote(
        AND title = $3
        AND deleted_at IS NULL
      LIMIT 1`,
-    [tenantId, input.appointmentId, title]
+    [tenantId, input.appointment.id, input.title]
   );
 
   const noteId = existing.rows[0]?.id ?? (
@@ -654,11 +1113,11 @@ async function upsertHandoffNote(
        RETURNING id`,
       [
         tenantId,
-        input.patientId,
-        input.appointmentId,
+        input.appointment.patientId,
+        input.appointment.id,
         input.createdByUserId,
-        title,
-        "Nota de enlace demo para validar historial tipo chat y notificaciones."
+        input.title,
+        `Nota de enlace smoke para ${input.title}.`
       ]
     )
   ).rows[0]!.id;
@@ -674,9 +1133,9 @@ async function upsertHandoffNote(
     [
       tenantId,
       noteId,
-      input.patientId,
+      input.appointment.patientId,
       input.createdByUserId,
-      "Nota de enlace demo para validar historial tipo chat y notificaciones."
+      `Nota de enlace smoke para ${input.title}. Validar destinatarios, notificaciones y conversacion.`
     ]
   );
 
@@ -689,8 +1148,8 @@ async function upsertHandoffNote(
     );
     await upsertNotification(client, tenantId, recipientUserId, {
       type: "handoff_note_received",
-      title: "Demo: nota de enlace",
-      message: "Tienes una nota de enlace demo pendiente de lectura."
+      title: `Smoke: ${input.title}`,
+      message: "Tienes una nota de enlace smoke pendiente de lectura."
     });
   }
 
@@ -739,10 +1198,14 @@ function requireCollaborator(user: DemoUser) {
   return user.collaboratorId;
 }
 
-function timeOnDate(date: Date, hour: number, minute: number) {
-  const value = new Date(date);
-  value.setHours(hour, minute, 0, 0);
-  return value.toISOString();
+function timeOnDate(year: number, monthDay: string, time: string) {
+  const [month, day] = monthDay.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0)).toISOString();
+}
+
+function addMinutes(isoDate: string, minutes: number) {
+  return new Date(new Date(isoDate).getTime() + minutes * 60_000).toISOString();
 }
 
 seedSmokeDemo()

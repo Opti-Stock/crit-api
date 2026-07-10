@@ -52,13 +52,14 @@ async function bootstrapSuperAdmin() {
     throw error;
   } finally {
     client.release();
-    await platformPool.end();
   }
 }
 
-bootstrapSuperAdmin().catch((error: unknown) => {
-  console.error("Platform super admin bootstrap failed", {
-    message: error instanceof Error ? error.message : "Unknown error"
-  });
-  process.exitCode = 1;
-});
+bootstrapSuperAdmin()
+  .catch((error: unknown) => {
+    console.error("Platform super admin bootstrap failed", {
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+    process.exitCode = 1;
+  })
+  .finally(() => platformPool.end());
