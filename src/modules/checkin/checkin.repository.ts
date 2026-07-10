@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from "pg";
 
 import { pool } from "../../config/db.js";
 import { withTenantTransaction } from "../../shared/db/tenant-transaction.js";
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
+import { ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js";
 import type { ListCheckinAppointmentsInput, ScanCheckinInput } from "./checkin.validation.js";
 
 export interface CheckinAppointmentSummary {
@@ -29,6 +29,12 @@ export interface ScanCheckinResult {
   patient: { id: string; fullName: string; externalId: string | null };
   checkedIn: boolean;
   alreadyCheckedIn: boolean;
+  scanStatus:
+    | "checkin_registered"
+    | "already_checked_in"
+    | "no_appointments_today"
+    | "therapeutic_match"
+    | "therapeutic_no_appointments";
   appointments: CheckinAppointmentSummary[];
 }
 
@@ -244,11 +250,30 @@ export class CheckinRepository {
          ORDER BY a.starts_at, p.full_name`,
         values
       );
-      if (appointments.rows.length === 0) {
-        throw new BadRequestError("Patient has no appointments for this day", "CHECKIN_NO_APPOINTMENTS_FOR_DAY");
+      const mode = input.mode ?? "reception-checkin";
+      const appointmentSummaries = appointments.rows.map(mapAppointment);
+
+      if (mode === "therapeutic-attendance") {
+        return {
+          patient: { id: patientRow.id, fullName: patientRow.full_name, externalId: patientRow.external_id },
+          checkedIn: appointmentSummaries.some((appointment) => appointment.isCheckedIn),
+          alreadyCheckedIn: appointmentSummaries.some((appointment) => appointment.isCheckedIn),
+          scanStatus: appointmentSummaries.length > 0 ? "therapeutic_match" : "therapeutic_no_appointments",
+          appointments: appointmentSummaries
+        };
       }
 
-      const alreadyCheckedIn = appointments.rows.some((row) => row.check_in_id);
+      if (appointments.rows.length === 0) {
+        return {
+          patient: { id: patientRow.id, fullName: patientRow.full_name, externalId: patientRow.external_id },
+          checkedIn: false,
+          alreadyCheckedIn: false,
+          scanStatus: "no_appointments_today",
+          appointments: []
+        };
+      }
+
+      const alreadyCheckedIn = appointmentSummaries.some((appointment) => appointment.isCheckedIn);
       if (!alreadyCheckedIn) {
         await client.query(
           `INSERT INTO appointment_check_ins (
@@ -278,6 +303,7 @@ export class CheckinRepository {
         patient: { id: patientRow.id, fullName: patientRow.full_name, externalId: patientRow.external_id },
         checkedIn: true,
         alreadyCheckedIn,
+        scanStatus: alreadyCheckedIn ? "already_checked_in" : "checkin_registered",
         appointments: refreshed.rows.map(mapAppointment)
       };
     }, this.databasePool);

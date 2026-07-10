@@ -21,7 +21,8 @@ export const listCheckinAppointmentsSchema = z.object({
 export const checkInAppointmentSchema = z.object({}).strict();
 export const scanCheckinSchema = z.object({
   code: z.string().trim().min(1).max(255),
-  date: optionalString(z.iso.date())
+  date: optionalString(z.iso.date()),
+  mode: optionalString(z.enum(["reception-checkin", "therapeutic-attendance"]))
 }).strict();
 
 export type ListCheckinAppointmentsInput = z.output<typeof listCheckinAppointmentsSchema>;
