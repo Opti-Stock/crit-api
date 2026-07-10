@@ -39,7 +39,16 @@ No subir `.env` al repositorio.
 
 ## Local con Docker Compose
 
-Desde `crit-api`:
+Primero levantar `crit-db`, porque el compose de API se une a la red Docker
+externa `crit-db_default` y conecta directo al servicio `crit-db:5432`.
+
+Desde `crit-db`:
+
+```bash
+docker compose up --build --wait
+```
+
+Luego, desde `crit-api`:
 
 ```bash
 npm install
@@ -58,11 +67,16 @@ super-admin API http://localhost:3003/health
 El compose espera que la base de datos ya exista. Para Docker local usa por default:
 
 ```txt
-API_DATABASE_URL=postgresql://crit_app:crit_app@host.docker.internal:5432/crit_db
-API_PLATFORM_DATABASE_URL=postgresql://crit_platform_app:crit_platform_app@host.docker.internal:5432/crit_db
+API_DATABASE_URL=postgresql://crit_app:crit_app@crit-db:5432/crit_db
+API_PLATFORM_DATABASE_URL=postgresql://crit_platform_app:crit_platform_app@crit-db:5432/crit_db
 ```
 
-Si la DB vive en otra red o proveedor, exportar esas dos variables antes de `docker compose up`.
+No usar `host.docker.internal` para el flujo local con DB en Docker: en Docker
+Desktop puede resolver a una IP del host que no acepta conexiones desde los
+contenedores y producir `ETIMEDOUT` en login o check-in.
+
+Si la DB vive en otra red o proveedor, exportar esas dos variables antes de
+`docker compose up` con el host real de esa DB.
 
 ## Render
 
