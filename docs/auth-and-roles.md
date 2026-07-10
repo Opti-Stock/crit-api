@@ -34,6 +34,7 @@ JWT_AUDIENCE=crit-assist
 - `admin`
 - `direccion`
 - `recepcion`
+- `recepcion_general`
 - `coordinador`
 - `medico`
 - `terapeuta`
@@ -46,6 +47,9 @@ JWT_AUDIENCE=crit-assist
   receive clinical access automatically.
 - `recepcion` can read operational attendance information, but cannot register
   attendance and must never receive medical note content.
+- `recepcion_general` is reserved for the main reception desk. It can access the
+  check-in scanner for all appointments in the tenant, but does not receive
+  calendar, attendance, or clinical note permissions in the main app.
 - `medico` and `terapeuta` register attendance and medical notes under clinical
   RLS policies.
 - `coordinador` manages calendars and appointments for authorized clinics.

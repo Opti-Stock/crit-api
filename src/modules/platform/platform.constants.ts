@@ -2,6 +2,7 @@ export const CANONICAL_TENANT_ROLES = [
   { name: "admin", description: "Administracion completa del tenant" },
   { name: "direccion", description: "Direccion y supervision operativa" },
   { name: "recepcion", description: "Recepcion y seguimiento operativo sin contenido clinico" },
+  { name: "recepcion_general", description: "Recepcion principal para check-in global del CRIT" },
   { name: "coordinador", description: "Coordinacion de clinicas y agenda" },
   { name: "medico", description: "Atencion medica y notas clinicas" },
   { name: "terapeuta", description: "Atencion terapeutica y notas clinicas" },

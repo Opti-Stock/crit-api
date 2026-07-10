@@ -18,7 +18,7 @@ export const checkinRouter = Router();
 checkinRouter.use(
   authenticateRequest,
   requireTenantContext,
-  requireRoles("admin", "direccion", "recepcion", "medico", "terapeuta")
+  requireRoles("admin", "direccion", "recepcion", "recepcion_general", "medico", "terapeuta")
 );
 
 checkinRouter.get("/appointments", controller.listAppointments);

@@ -11,7 +11,16 @@ export const realtimeRouter = Router();
 realtimeRouter.use(
   authenticateRequest,
   requireTenantContext,
-  requireRoles("admin", "direccion", "recepcion", "coordinador", "medico", "terapeuta", "personal_acompanamiento")
+  requireRoles(
+    "admin",
+    "direccion",
+    "recepcion",
+    "recepcion_general",
+    "coordinador",
+    "medico",
+    "terapeuta",
+    "personal_acompanamiento"
+  )
 );
 
 realtimeRouter.get("/events", controller.stream);

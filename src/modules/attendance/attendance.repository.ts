@@ -405,15 +405,18 @@ async function notifyReceptionRescheduleRequest(
      JOIN roles r
        ON r.tenant_id = ur.tenant_id
       AND r.id = ur.role_id
-      AND r.name = 'recepcion'
       AND r.deleted_at IS NULL
-     JOIN user_clinic_access uca
+     LEFT JOIN user_clinic_access uca
        ON uca.tenant_id = u.tenant_id
       AND uca.user_id = u.id
       AND uca.clinic_id = $2
      WHERE u.tenant_id = $1
        AND u.status = 'active'
-       AND u.deleted_at IS NULL`,
+       AND u.deleted_at IS NULL
+       AND (
+         r.name = 'recepcion_general'
+         OR (r.name = 'recepcion' AND uca.clinic_id IS NOT NULL)
+       )`,
     [input.tenantId, input.appointment.clinic_id]
   );
 
