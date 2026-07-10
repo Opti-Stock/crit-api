@@ -21,21 +21,22 @@ Disparados automáticamente hoy:
   `handoff-notes`), para cada recipient.
 - `pending_note`: al registrar asistencia con `notesRequired: true`
   (módulo `attendance`), para el colaborador que la registró.
+- `appointment_change`: al registrar asistencia como `rescheduled`, se crea
+  una solicitud de reagendar para usuarios de recepción con acceso a la
+  clínica de la cita.
 
 Sin disparo automático todavía (requieren infraestructura que no existe en
 este repo, igual que los recordatorios externos a pacientes):
 
 - `appointment_reminder`, `unregistered_attendance`: necesitan un
   scheduler/cron para detectar citas próximas o asistencias sin registrar.
-- `appointment_change`: necesita un endpoint de actualización de citas que
-  no existe (`appointments` solo soporta crear y listar).
 - `administrative_alert`: se crea manualmente vía `POST`, no automático por
   diseño.
 
 ## Endpoints
 
 - `GET /api/notifications` — lista paginada (`page`, `pageSize`, `status`:
-  `unread`/`read`).
+  `unread`/`read`, `type`: uno de los tipos soportados).
 - `GET /api/notifications/:notificationId` — detalle.
 - `PATCH /api/notifications/:notificationId/read` — marca como leída.
 - `PATCH /api/notifications/:notificationId/unread` — marca como no leída.
