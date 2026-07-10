@@ -505,7 +505,10 @@ interface DemoAppointment {
   id: string;
   key: string;
   patientId: string;
+  patientName: string;
   collaboratorId: string;
+  clinicId: string;
+  startsAt: string;
 }
 
 async function seedSmokeDemo() {
@@ -608,12 +611,14 @@ async function seedSmokeDemo() {
     await upsertNotification(client, tenantId, users.terapeuta_sur.id, {
       type: "pending_note",
       title: "Smoke: nota medica pendiente",
-      message: "Notificacion demo para validar contador de terapeuta."
+      message: "Notificacion demo para validar contador de terapeuta.",
+      metadata: buildAppointmentNotificationMetadata(appointments.julio_nota_medica, "pending_note")
     });
     await upsertNotification(client, tenantId, users.recepcion_general.id, {
       type: "appointment_change",
       title: "Smoke: solicitud de reagendar",
-      message: "Notificacion demo para recepcion general."
+      message: "Notificacion demo para recepcion general.",
+      metadata: buildAppointmentNotificationMetadata(appointments.julio_reagendar_sur, "reschedule")
     });
 
     return {
@@ -1027,6 +1032,7 @@ async function upsertAppointments(
     appointments[appointment.key] = await upsertAppointment(client, tenantId, {
       key: appointment.key,
       patientId: input.patients[appointment.patientKey].id,
+      patientName: input.patients[appointment.patientKey].fullName,
       collaboratorId: requireCollaborator(input.users[appointment.userKey]),
       clinicId: input.clinics[appointment.clinicKey].id,
       roomId: input.rooms[appointment.roomKey].id,
@@ -1047,6 +1053,7 @@ async function upsertAppointment(
   input: {
     key: string;
     patientId: string;
+    patientName: string;
     collaboratorId: string;
     clinicId: string;
     roomId: string;
@@ -1088,7 +1095,15 @@ async function upsertAppointment(
         input.actorUserId
       ]
     );
-    return { id: existing.rows[0].id, key: input.key, patientId: input.patientId, collaboratorId: input.collaboratorId };
+    return {
+      id: existing.rows[0].id,
+      key: input.key,
+      patientId: input.patientId,
+      patientName: input.patientName,
+      collaboratorId: input.collaboratorId,
+      clinicId: input.clinicId,
+      startsAt: input.startsAt
+    };
   }
 
   const inserted = await client.query<{ id: string }>(
@@ -1110,7 +1125,15 @@ async function upsertAppointment(
       input.actorUserId
     ]
   );
-  return { id: inserted.rows[0]!.id, key: input.key, patientId: input.patientId, collaboratorId: input.collaboratorId };
+  return {
+    id: inserted.rows[0]!.id,
+    key: input.key,
+    patientId: input.patientId,
+    patientName: input.patientName,
+    collaboratorId: input.collaboratorId,
+    clinicId: input.clinicId,
+    startsAt: input.startsAt
+  };
 }
 
 async function upsertCheckIn(
@@ -1261,7 +1284,24 @@ async function upsertHandoffNote(
     await upsertNotification(client, tenantId, recipientUserId, {
       type: "handoff_note_received",
       title: `Smoke: ${input.title}`,
-      message: "Tienes una nota de enlace smoke pendiente de lectura."
+      message: "Tienes una nota de enlace smoke pendiente de lectura.",
+      metadata: {
+        target: {
+          type: "handoff_note",
+          entityId: noteId,
+          handoffNoteId: noteId,
+          patientId: input.appointment.patientId
+        },
+        patient: {
+          id: input.appointment.patientId,
+          fullName: input.appointment.patientName
+        },
+        handoffNote: { id: noteId },
+        appointment: {
+          id: input.appointment.id,
+          startsAt: input.appointment.startsAt
+        }
+      }
     });
   }
 
@@ -1272,7 +1312,7 @@ async function upsertNotification(
   client: PoolClient,
   tenantId: string,
   userId: string,
-  input: { type: string; title: string; message: string }
+  input: { type: string; title: string; message: string; metadata?: Record<string, unknown> }
 ) {
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM notifications
@@ -1287,18 +1327,42 @@ async function upsertNotification(
     await client.query(
       `UPDATE notifications
        SET message = $5,
+           metadata = $6,
            read_at = NULL
        WHERE tenant_id = $1 AND id = $2 AND user_id = $3 AND type = $4`,
-      [tenantId, existing.rows[0].id, userId, input.type, input.message]
+      [tenantId, existing.rows[0].id, userId, input.type, input.message, input.metadata ?? {}]
     );
     return;
   }
 
   await client.query(
-    `INSERT INTO notifications (tenant_id, user_id, type, title, message)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [tenantId, userId, input.type, input.title, input.message]
+    `INSERT INTO notifications (tenant_id, user_id, type, title, message, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [tenantId, userId, input.type, input.title, input.message, input.metadata ?? {}]
   );
+}
+
+function buildAppointmentNotificationMetadata(
+  appointment: DemoAppointment,
+  requestedAction: "pending_note" | "reschedule"
+) {
+  return {
+    target: {
+      type: "appointment",
+      entityId: appointment.id,
+      patientId: appointment.patientId
+    },
+    patient: {
+      id: appointment.patientId,
+      fullName: appointment.patientName
+    },
+    appointment: {
+      id: appointment.id,
+      startsAt: appointment.startsAt,
+      clinicId: appointment.clinicId
+    },
+    requestedAction
+  };
 }
 
 async function setCurrentUser(client: PoolClient, userId: string) {

@@ -119,6 +119,10 @@ export class NotificationsRepository {
 
       if (input.status === "unread") filters.push("n.read_at IS NULL");
       if (input.status === "read") filters.push("n.read_at IS NOT NULL");
+      if (input.type) {
+        values.push(input.type);
+        filters.push(`n.type = $${values.length}`);
+      }
 
       const where = filters.join(" AND ");
       const count = await client.query<{ count: string }>(
