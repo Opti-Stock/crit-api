@@ -33,6 +33,21 @@ interface AttendanceRow {
   notes_required: boolean;
 }
 
+interface AttendanceAppointmentRow {
+  id: string;
+  patient_id: string;
+  patient_full_name: string;
+  collaborator_id: string;
+  collaborator_full_name: string;
+  clinic_id: string;
+  starts_at: string | Date;
+}
+
+interface AttendanceRecordForUpdateRow extends AttendanceAppointmentRow {
+  appointment_id: string;
+  status: string;
+}
+
 const SELECT_ATTENDANCE = `
   SELECT ar.id, ar.appointment_id,
     ar.patient_id, p.full_name AS patient_full_name,
@@ -144,9 +159,14 @@ export class AttendanceRepository {
     input: CreateAttendanceInput
   ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
-      const appointment = await client.query<{ patient_id: string; collaborator_id: string }>(
-        `SELECT patient_id, collaborator_id FROM appointments
-         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      const appointment = await client.query<AttendanceAppointmentRow>(
+        `SELECT a.id, a.patient_id, p.full_name AS patient_full_name,
+                a.collaborator_id, c.full_name AS collaborator_full_name,
+                a.clinic_id, a.starts_at
+         FROM appointments a
+         JOIN patients p ON p.tenant_id = a.tenant_id AND p.id = a.patient_id
+         JOIN collaborators c ON c.tenant_id = a.tenant_id AND c.id = a.collaborator_id
+         WHERE a.tenant_id = $1 AND a.id = $2 AND a.deleted_at IS NULL`,
         [tenantId, input.appointmentId]
       );
       const appointmentRow = appointment.rows[0];
@@ -202,6 +222,14 @@ export class AttendanceRepository {
           });
         }
 
+        if (input.status === "rescheduled") {
+          await notifyReceptionRescheduleRequest(client, {
+            tenantId,
+            actorId,
+            appointment: appointmentRow
+          });
+        }
+
         return (await this.findByIdWithClient(client, tenantId, attendance.id))!;
       } catch (error) {
         throw mapDatabaseError(error);
@@ -217,10 +245,16 @@ export class AttendanceRepository {
     input: UpdateAttendanceInput
   ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
-      const current = await client.query<{ collaborator_id: string }>(
-        `SELECT collaborator_id
-         FROM attendance_records
-         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      const current = await client.query<AttendanceRecordForUpdateRow>(
+        `SELECT a.id, ar.appointment_id, ar.collaborator_id, ar.status,
+                a.patient_id, p.full_name AS patient_full_name,
+                c.full_name AS collaborator_full_name,
+                a.clinic_id, a.starts_at
+         FROM attendance_records ar
+         JOIN appointments a ON a.tenant_id = ar.tenant_id AND a.id = ar.appointment_id
+         JOIN patients p ON p.tenant_id = ar.tenant_id AND p.id = ar.patient_id
+         JOIN collaborators c ON c.tenant_id = ar.tenant_id AND c.id = ar.collaborator_id
+         WHERE ar.tenant_id = $1 AND ar.id = $2 AND ar.deleted_at IS NULL`,
         [tenantId, attendanceId]
       );
       const currentRow = current.rows[0];
@@ -254,6 +288,23 @@ export class AttendanceRepository {
            WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
           [tenantId, attendanceId, input.status ?? null, actorId, input.notesRequired ?? null]
         );
+
+        if (input.status === "rescheduled" && currentRow.status !== "rescheduled") {
+          await notifyReceptionRescheduleRequest(client, {
+            tenantId,
+            actorId,
+            appointment: {
+              id: currentRow.appointment_id,
+              patient_id: currentRow.patient_id,
+              patient_full_name: currentRow.patient_full_name,
+              collaborator_id: currentRow.collaborator_id,
+              collaborator_full_name: currentRow.collaborator_full_name,
+              clinic_id: currentRow.clinic_id,
+              starts_at: currentRow.starts_at
+            }
+          });
+        }
+
         return (await this.findByIdWithClient(client, tenantId, attendanceId))!;
       } catch (error) {
         throw mapDatabaseError(error);
@@ -335,6 +386,70 @@ export class AttendanceRepository {
 
 function toIsoString(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+async function notifyReceptionRescheduleRequest(
+  client: PoolClient,
+  input: {
+    tenantId: string;
+    actorId: string;
+    appointment: AttendanceAppointmentRow;
+  }
+): Promise<void> {
+  const recipients = await client.query<{ id: string }>(
+    `SELECT DISTINCT u.id
+     FROM users u
+     JOIN user_roles ur
+       ON ur.tenant_id = u.tenant_id
+      AND ur.user_id = u.id
+     JOIN roles r
+       ON r.tenant_id = ur.tenant_id
+      AND r.id = ur.role_id
+      AND r.name = 'recepcion'
+      AND r.deleted_at IS NULL
+     JOIN user_clinic_access uca
+       ON uca.tenant_id = u.tenant_id
+      AND uca.user_id = u.id
+      AND uca.clinic_id = $2
+     WHERE u.tenant_id = $1
+       AND u.status = 'active'
+       AND u.deleted_at IS NULL`,
+    [input.tenantId, input.appointment.clinic_id]
+  );
+
+  const startsAt = toIsoString(input.appointment.starts_at);
+  for (const recipient of recipients.rows) {
+    await insertNotification(client, {
+      tenantId: input.tenantId,
+      userId: recipient.id,
+      actorId: input.actorId,
+      type: "appointment_change",
+      title: "Solicitud de reagendar cita",
+      message: `${input.appointment.collaborator_full_name} solicito reagendar la cita de ${input.appointment.patient_full_name}.`,
+      metadata: {
+        target: {
+          type: "appointment",
+          entityId: input.appointment.id,
+          patientId: input.appointment.patient_id
+        },
+        patient: {
+          id: input.appointment.patient_id,
+          fullName: input.appointment.patient_full_name
+        },
+        appointment: {
+          id: input.appointment.id,
+          startsAt,
+          clinicId: input.appointment.clinic_id
+        },
+        requestedBy: {
+          userId: input.actorId,
+          collaboratorId: input.appointment.collaborator_id,
+          fullName: input.appointment.collaborator_full_name
+        },
+        requestedAction: "reschedule"
+      }
+    });
+  }
 }
 
 function mapSummary(row: AttendanceRow): AttendanceSummary {
