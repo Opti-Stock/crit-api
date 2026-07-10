@@ -218,6 +218,8 @@ export class CheckinRepository {
     input: ScanCheckinInput
   ) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const badgeCode = input.code.replace(/[\x00-\x1F\x7F]/g, "").trim();
+      const badgeCodeLookup = badgeCode.toUpperCase();
       const patient = await client.query<{ id: string; full_name: string; external_id: string | null }>(
         `SELECT id, full_name, external_id
          FROM patients
@@ -225,13 +227,13 @@ export class CheckinRepository {
            AND deleted_at IS NULL
            AND status = 'active'
            AND (
-             id::text = $2
-             OR external_id = $2
+             upper(id::text) = $2
+             OR upper(external_id) = $2
              OR full_name ILIKE $3
            )
-         ORDER BY CASE WHEN external_id = $2 OR id::text = $2 THEN 0 ELSE 1 END, full_name
+         ORDER BY CASE WHEN upper(external_id) = $2 OR upper(id::text) = $2 THEN 0 ELSE 1 END, full_name
          LIMIT 1`,
-        [tenantId, input.code, `%${input.code}%`]
+        [tenantId, badgeCodeLookup, `%${badgeCode}%`]
       );
       const patientRow = patient.rows[0];
       if (!patientRow) throw new NotFoundError("Patient not found for badge", "CHECKIN_PATIENT_NOT_FOUND");
