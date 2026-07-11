@@ -329,13 +329,30 @@ export class CheckinRepository {
     filters: string[]
   ) {
     if (this.isTenantWide(actorRoles)) return;
-    const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
-    if (clinicIds.length === 0) {
+
+    const accessClauses: string[] = [];
+    if (actorRoles.some((role) => role === "recepcion")) {
+      const clinicIds = await this.resolveAccessibleClinicIds(client, tenantId, actorId);
+      if (clinicIds.length > 0) {
+        values.push(clinicIds);
+        accessClauses.push(`a.clinic_id = ANY($${values.length}::uuid[])`);
+      }
+    }
+
+    if (actorRoles.some((role) => role === "medico" || role === "terapeuta")) {
+      const collaboratorId = await this.resolveOwnCollaboratorId(client, tenantId, actorId);
+      if (collaboratorId) {
+        values.push(collaboratorId);
+        accessClauses.push(`a.collaborator_id = $${values.length}`);
+      }
+    }
+
+    if (accessClauses.length === 0) {
       filters.push("FALSE");
       return;
     }
-    values.push(clinicIds);
-    filters.push(`a.clinic_id = ANY($${values.length}::uuid[])`);
+
+    filters.push(`(${accessClauses.join(" OR ")})`);
   }
 
   private async assertCanAccessClinic(
@@ -362,6 +379,14 @@ export class CheckinRepository {
       [tenantId, userId]
     );
     return result.rows.map((row) => row.clinic_id);
+  }
+
+  private async resolveOwnCollaboratorId(client: PoolClient, tenantId: string, userId: string) {
+    const result = await client.query<{ id: string }>(
+      `SELECT id FROM collaborators WHERE tenant_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+      [tenantId, userId]
+    );
+    return result.rows[0]?.id ?? null;
   }
 }
 
