@@ -612,7 +612,7 @@ async function seedSmokeDemo() {
       type: "pending_note",
       title: "Smoke: nota medica pendiente",
       message: "Notificacion demo para validar contador de terapeuta.",
-      metadata: buildAppointmentNotificationMetadata(appointments.julio_nota_medica, "pending_note")
+      metadata: buildAppointmentNotificationMetadata(appointments.junio_presente_norte, "pending_note")
     });
     await upsertNotification(client, tenantId, users.recepcion_general.id, {
       type: "appointment_change",
