@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="470" height="188" viewBox="0 0 470 188" role="img" aria-label="Codigo de barras DEMO-PAT-INF-002">
+  <rect width="100%" height="100%" fill="#fff"/>
+  <g fill="#000">
+    <rect x="24" y="20" width="4" height="118"/>
+    <rect x="30" y="20" width="2" height="118"/>
+    <rect x="36" y="20" width="2" height="118"/>
+    <rect x="46" y="20" width="2" height="118"/>
+    <rect x="50" y="20" width="4" height="118"/>
+    <rect x="60" y="20" width="2" height="118"/>
+    <rect x="68" y="20" width="2" height="118"/>
+    <rect x="76" y="20" width="4" height="118"/>
+    <rect x="82" y="20" width="2" height="118"/>
+    <rect x="90" y="20" width="2" height="118"/>
+    <rect x="94" y="20" width="6" height="118"/>
+    <rect x="102" y="20" width="4" height="118"/>
+    <rect x="112" y="20" width="2" height="118"/>
+    <rect x="120" y="20" width="6" height="118"/>
+    <rect x="128" y="20" width="4" height="118"/>
+    <rect x="134" y="20" width="2" height="118"/>
+    <rect x="140" y="20" width="4" height="118"/>
+    <rect x="146" y="20" width="6" height="118"/>
+    <rect x="156" y="20" width="6" height="118"/>
+    <rect x="164" y="20" width="6" height="118"/>
+    <rect x="172" y="20" width="4" height="118"/>
+    <rect x="178" y="20" width="2" height="118"/>
+    <rect x="182" y="20" width="2" height="118"/>
+    <rect x="190" y="20" width="4" height="118"/>
+    <rect x="200" y="20" width="4" height="118"/>
+    <rect x="206" y="20" width="6" height="118"/>
+    <rect x="218" y="20" width="2" height="118"/>
+    <rect x="222" y="20" width="2" height="118"/>
+    <rect x="228" y="20" width="4" height="118"/>
+    <rect x="234" y="20" width="6" height="118"/>
+    <rect x="244" y="20" width="4" height="118"/>
+    <rect x="254" y="20" width="2" height="118"/>
+    <rect x="262" y="20" width="2" height="118"/>
+    <rect x="266" y="20" width="2" height="118"/>
+    <rect x="270" y="20" width="6" height="118"/>
+    <rect x="282" y="20" width="4" height="118"/>
+    <rect x="288" y="20" width="2" height="118"/>
+    <rect x="296" y="20" width="4" height="118"/>
+    <rect x="306" y="20" width="2" height="118"/>
+    <rect x="310" y="20" width="2" height="118"/>
+    <rect x="316" y="20" width="4" height="118"/>
+    <rect x="322" y="20" width="6" height="118"/>
+    <rect x="332" y="20" width="2" height="118"/>
+    <rect x="338" y="20" width="6" height="118"/>
+    <rect x="346" y="20" width="4" height="118"/>
+    <rect x="354" y="20" width="2" height="118"/>
+    <rect x="360" y="20" width="6" height="118"/>
+    <rect x="368" y="20" width="4" height="118"/>
+    <rect x="376" y="20" width="4" height="118"/>
+    <rect x="384" y="20" width="6" height="118"/>
+    <rect x="394" y="20" width="2" height="118"/>
+    <rect x="398" y="20" width="2" height="118"/>
+    <rect x="402" y="20" width="2" height="118"/>
+    <rect x="410" y="20" width="4" height="118"/>
+    <rect x="420" y="20" width="4" height="118"/>
+    <rect x="430" y="20" width="6" height="118"/>
+    <rect x="438" y="20" width="2" height="118"/>
+    <rect x="442" y="20" width="4" height="118"/>
+  </g>
+  <text x="235" y="164" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111827">DEMO-PAT-INF-002</text>
+  <text x="235" y="184" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#475569">Paciente Smoke Infantil Futuro</text>
+</svg>

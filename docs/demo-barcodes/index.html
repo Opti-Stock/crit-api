@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codigos de barras demo CRIT Assist</title>
+  <style>
+    body { margin: 24px; font-family: Arial, Helvetica, sans-serif; color: #111827; background: #f8fafc; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0 0 20px; color: #475569; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+    .card { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; break-inside: avoid; }
+    .card strong { display: block; margin-bottom: 6px; }
+    img { width: 100%; max-width: 520px; height: auto; display: block; }
+    code { font-weight: 700; }
+    @media print { body { background: #fff; margin: 12mm; } .card { page-break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <h1>Codigos de barras demo CRIT Assist</h1>
+  <p>Escanear el valor Code 128 del campo <code>external_id</code> del paciente.</p>
+  <section class="grid">
+    <article class="card"><strong>Paciente Smoke Norte Asistencia</strong><img src="demo-pat-norte-001.svg" alt="Codigo DEMO-PAT-NORTE-001" /></article>
+    <article class="card"><strong>Paciente Smoke Norte Inasistencia</strong><img src="demo-pat-norte-002.svg" alt="Codigo DEMO-PAT-NORTE-002" /></article>
+    <article class="card"><strong>Paciente Smoke Sur Checkin Pendiente Asistencia</strong><img src="demo-pat-sur-001.svg" alt="Codigo DEMO-PAT-SUR-001" /></article>
+    <article class="card"><strong>Paciente Smoke Sur Solicitud Reagendar</strong><img src="demo-pat-sur-002.svg" alt="Codigo DEMO-PAT-SUR-002" /></article>
+    <article class="card"><strong>Paciente Smoke Infantil Lenguaje</strong><img src="demo-pat-inf-001.svg" alt="Codigo DEMO-PAT-INF-001" /></article>
+    <article class="card"><strong>Paciente Smoke Infantil Futuro</strong><img src="demo-pat-inf-002.svg" alt="Codigo DEMO-PAT-INF-002" /></article>
+    <article class="card"><strong>Paciente Smoke Cita Cancelada</strong><img src="demo-pat-can-001.svg" alt="Codigo DEMO-PAT-CAN-001" /></article>
+    <article class="card"><strong>Paciente Smoke Valido Sin Citas</strong><img src="demo-pat-sin-001.svg" alt="Codigo DEMO-PAT-SIN-001" /></article>
+  </section>
+</body>
+</html>
