@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 
+import { corsOptions } from "../../config/cors.js";
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
 import { platformRouter } from "../../modules/platform/platform.routes.js";
@@ -9,7 +10,7 @@ import { platformRouter } from "../../modules/platform/platform.routes.js";
 export const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get("/health", (_request, response) => {
