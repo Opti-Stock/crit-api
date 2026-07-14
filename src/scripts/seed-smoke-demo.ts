@@ -10,7 +10,7 @@ import { withTenantTransaction } from "../shared/db/tenant-transaction.js";
 const TENANT_CODE = process.env.DEMO_TENANT_CODE?.trim().toUpperCase() || "CRIT-OCC-01";
 const DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD || "DemoPassword123";
 const DEMO_YEAR = Number(process.env.DEMO_YEAR || "2026");
-const DEMO_BUSINESS_START_MINUTES = 7 * 60;
+const DEMO_BUSINESS_START_MINUTES = 2 * 60;
 const DEMO_BUSINESS_END_MINUTES = 19 * 60;
 
 const DEMO_CLINICS = [
@@ -189,7 +189,7 @@ const DEMO_USERS = [
 const DEMO_PATIENTS = [
   {
     key: "norte_asiste",
-    externalId: "DEMO-PAT-NORTE-001",
+    externalId: "7500000000015",
     fullName: "Mateo Lopez Garcia",
     birthDate: "2014-05-10",
     phone: "5550101001",
@@ -199,7 +199,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "norte_falta",
-    externalId: "DEMO-PAT-NORTE-002",
+    externalId: "7500000000022",
     fullName: "Valentina Hernandez Ruiz",
     birthDate: "2012-09-18",
     phone: "5550101002",
@@ -209,7 +209,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "sur_checkin",
-    externalId: "DEMO-PAT-SUR-001",
+    externalId: "7500000000039",
     fullName: "Santiago Ramirez Torres",
     birthDate: "2015-03-12",
     phone: "5550101003",
@@ -219,7 +219,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "sur_reagenda",
-    externalId: "DEMO-PAT-SUR-002",
+    externalId: "7500000000046",
     fullName: "Camila Martinez Flores",
     birthDate: "2011-11-08",
     phone: "5550101004",
@@ -229,7 +229,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "infantil_lenguaje",
-    externalId: "DEMO-PAT-INF-001",
+    externalId: "7500000000053",
     fullName: "Emiliano Sanchez Perez",
     birthDate: "2017-02-20",
     phone: "5550101005",
@@ -239,7 +239,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "infantil_futuro",
-    externalId: "DEMO-PAT-INF-002",
+    externalId: "7500000000060",
     fullName: "Renata Gutierrez Morales",
     birthDate: "2018-07-01",
     phone: "5550101006",
@@ -249,7 +249,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "cancelada",
-    externalId: "DEMO-PAT-CAN-001",
+    externalId: "7500000000077",
     fullName: "Diego Torres Navarro",
     birthDate: "2013-12-02",
     phone: "5550101007",
@@ -259,7 +259,7 @@ const DEMO_PATIENTS = [
   },
   {
     key: "sin_citas",
-    externalId: "DEMO-PAT-SIN-001",
+    externalId: "7500000000084",
     fullName: "Lucia Vargas Mendoza",
     birthDate: "2016-10-15",
     phone: "5550101008",
@@ -308,7 +308,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "norte-consultorio-1",
     typeKey: "medicina",
     date: "06-03",
-    time: "09:00",
+    time: "02:00",
     duration: 45,
     status: "scheduled",
     checkIn: true,
@@ -324,7 +324,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "norte-consultorio-2",
     typeKey: "valoracion",
     date: "06-10",
-    time: "10:30",
+    time: "02:30",
     duration: 60,
     status: "scheduled",
     checkIn: false,
@@ -340,7 +340,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "sur-terapia-a",
     typeKey: "terapia_fisica",
     date: "06-18",
-    time: "12:00",
+    time: "03:00",
     duration: 50,
     status: "cancelled",
     checkIn: false
@@ -353,7 +353,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "sur-terapia-a",
     typeKey: "terapia_fisica",
     date: "07-10",
-    time: "09:00",
+    time: "02:00",
     duration: 50,
     status: "scheduled",
     checkIn: true
@@ -366,7 +366,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "sur-terapia-b",
     typeKey: "terapia_fisica",
     date: "07-10",
-    time: "11:00",
+    time: "02:30",
     duration: 50,
     status: "rescheduled",
     checkIn: true,
@@ -381,7 +381,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "infantil-lenguaje",
     typeKey: "lenguaje",
     date: "07-16",
-    time: "13:00",
+    time: "03:00",
     duration: 40,
     status: "scheduled",
     checkIn: false
@@ -394,7 +394,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "infantil-estimulacion",
     typeKey: "valoracion",
     date: "07-22",
-    time: "08:30",
+    time: "03:30",
     duration: 60,
     status: "scheduled",
     checkIn: false,
@@ -408,7 +408,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "infantil-lenguaje",
     typeKey: "lenguaje",
     date: "08-05",
-    time: "09:30",
+    time: "02:00",
     duration: 40,
     status: "scheduled",
     checkIn: false
@@ -421,7 +421,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "norte-consultorio-1",
     typeKey: "medicina",
     date: "08-14",
-    time: "10:00",
+    time: "02:30",
     duration: 45,
     status: "scheduled",
     checkIn: false
@@ -434,7 +434,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "sur-consultorio",
     typeKey: "valoracion",
     date: "08-28",
-    time: "12:30",
+    time: "03:00",
     duration: 60,
     status: "rescheduled",
     checkIn: false
@@ -449,7 +449,7 @@ const WEEKLY_APPOINTMENT_TEMPLATES = [
     clinicKey: "norte",
     roomKey: "norte-consultorio-1",
     typeKey: "medicina",
-    time: "08:00",
+    time: "02:00",
     duration: 45
   },
   {
@@ -459,7 +459,7 @@ const WEEKLY_APPOINTMENT_TEMPLATES = [
     clinicKey: "sur",
     roomKey: "sur-terapia-a",
     typeKey: "terapia_fisica",
-    time: "10:00",
+    time: "02:30",
     duration: 50
   },
   {
@@ -469,7 +469,7 @@ const WEEKLY_APPOINTMENT_TEMPLATES = [
     clinicKey: "infantil",
     roomKey: "infantil-lenguaje",
     typeKey: "lenguaje",
-    time: "12:00",
+    time: "03:00",
     duration: 40
   }
 ] as const satisfies readonly (Omit<DemoAppointmentConfig, "key" | "date" | "status" | "checkIn" | "attendance" | "medicalNote" | "handoff"> & {
@@ -859,24 +859,28 @@ async function upsertPatient(
 ): Promise<DemoPatient> {
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM patients
-     WHERE tenant_id = $1 AND external_id = $2 AND deleted_at IS NULL
+     WHERE tenant_id = $1
+       AND (external_id = $2 OR email = $3)
+       AND deleted_at IS NULL
      LIMIT 1`,
-    [tenantId, input.externalId]
+    [tenantId, input.externalId, input.email]
   );
   if (existing.rows[0]) {
     await client.query(
       `UPDATE patients
-       SET full_name = $3,
-           birth_date = $4,
-           phone = $5,
-           email = $6,
-           disability = $7,
-           gender = $8,
+       SET external_id = $3,
+           full_name = $4,
+           birth_date = $5,
+           phone = $6,
+           email = $7,
+           disability = $8,
+           gender = $9,
            status = 'active'
        WHERE tenant_id = $1 AND id = $2`,
       [
         tenantId,
         existing.rows[0].id,
+        input.externalId,
         input.fullName,
         input.birthDate,
         input.phone,
@@ -1386,7 +1390,7 @@ function timeOnDate(year: number, monthDay: string, time: string) {
 function assertDemoBusinessTime(monthDay: string, time: string, hour: number, minute: number) {
   const minutes = hour * 60 + minute;
   if (minutes < DEMO_BUSINESS_START_MINUTES || minutes > DEMO_BUSINESS_END_MINUTES) {
-    throw new Error(`Demo appointment ${monthDay} ${time} is outside the 07:00-19:00 window`);
+    throw new Error(`Demo appointment ${monthDay} ${time} is outside the 02:00-19:00 window`);
   }
 }
 
