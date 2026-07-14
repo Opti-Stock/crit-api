@@ -10,7 +10,7 @@ import { withTenantTransaction } from "../shared/db/tenant-transaction.js";
 const TENANT_CODE = process.env.DEMO_TENANT_CODE?.trim().toUpperCase() || "CRIT-OCC-01";
 const DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD || "DemoPassword123";
 const DEMO_YEAR = Number(process.env.DEMO_YEAR || "2026");
-const DEMO_BUSINESS_START_MINUTES = 2 * 60;
+const DEMO_BUSINESS_START_MINUTES = 9 * 60;
 const DEMO_BUSINESS_END_MINUTES = 19 * 60;
 
 const DEMO_CLINICS = [
@@ -307,8 +307,8 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     clinicKey: "norte",
     roomKey: "norte-consultorio-1",
     typeKey: "medicina",
-    date: "06-03",
-    time: "02:00",
+    date: "07-14",
+    time: "09:00",
     duration: 45,
     status: "scheduled",
     checkIn: true,
@@ -323,8 +323,8 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     clinicKey: "norte",
     roomKey: "norte-consultorio-2",
     typeKey: "valoracion",
-    date: "06-10",
-    time: "02:30",
+    date: "07-14",
+    time: "10:30",
     duration: 60,
     status: "scheduled",
     checkIn: false,
@@ -339,8 +339,8 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     clinicKey: "sur",
     roomKey: "sur-terapia-a",
     typeKey: "terapia_fisica",
-    date: "06-18",
-    time: "03:00",
+    date: "07-14",
+    time: "12:00",
     duration: 50,
     status: "cancelled",
     checkIn: false
@@ -352,8 +352,8 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     clinicKey: "sur",
     roomKey: "sur-terapia-a",
     typeKey: "terapia_fisica",
-    date: "07-10",
-    time: "02:00",
+    date: "07-15",
+    time: "09:00",
     duration: 50,
     status: "scheduled",
     checkIn: true
@@ -365,8 +365,8 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     clinicKey: "sur",
     roomKey: "sur-terapia-b",
     typeKey: "terapia_fisica",
-    date: "07-10",
-    time: "02:30",
+    date: "07-15",
+    time: "11:00",
     duration: 50,
     status: "rescheduled",
     checkIn: true,
@@ -381,7 +381,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "infantil-lenguaje",
     typeKey: "lenguaje",
     date: "07-16",
-    time: "03:00",
+    time: "13:00",
     duration: 40,
     status: "scheduled",
     checkIn: false
@@ -394,7 +394,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "infantil-estimulacion",
     typeKey: "valoracion",
     date: "07-22",
-    time: "03:30",
+    time: "09:30",
     duration: 60,
     status: "scheduled",
     checkIn: false,
@@ -408,7 +408,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "infantil-lenguaje",
     typeKey: "lenguaje",
     date: "08-05",
-    time: "02:00",
+    time: "09:00",
     duration: 40,
     status: "scheduled",
     checkIn: false
@@ -421,7 +421,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "norte-consultorio-1",
     typeKey: "medicina",
     date: "08-14",
-    time: "02:30",
+    time: "10:00",
     duration: 45,
     status: "scheduled",
     checkIn: false
@@ -434,7 +434,7 @@ const DEMO_APPOINTMENTS: readonly DemoAppointmentConfig[] = [
     roomKey: "sur-consultorio",
     typeKey: "valoracion",
     date: "08-28",
-    time: "03:00",
+    time: "12:30",
     duration: 60,
     status: "rescheduled",
     checkIn: false
@@ -449,7 +449,7 @@ const WEEKLY_APPOINTMENT_TEMPLATES = [
     clinicKey: "norte",
     roomKey: "norte-consultorio-1",
     typeKey: "medicina",
-    time: "02:00",
+    time: "09:00",
     duration: 45
   },
   {
@@ -459,7 +459,7 @@ const WEEKLY_APPOINTMENT_TEMPLATES = [
     clinicKey: "sur",
     roomKey: "sur-terapia-a",
     typeKey: "terapia_fisica",
-    time: "02:30",
+    time: "10:00",
     duration: 50
   },
   {
@@ -469,7 +469,7 @@ const WEEKLY_APPOINTMENT_TEMPLATES = [
     clinicKey: "infantil",
     roomKey: "infantil-lenguaje",
     typeKey: "lenguaje",
-    time: "03:00",
+    time: "12:00",
     duration: 40
   }
 ] as const satisfies readonly (Omit<DemoAppointmentConfig, "key" | "date" | "status" | "checkIn" | "attendance" | "medicalNote" | "handoff"> & {
@@ -939,12 +939,11 @@ function getDemoAppointmentConfigs(): readonly DemoAppointmentConfig[] {
 function buildWeeklyAppointmentConfigs(): DemoAppointmentConfig[] {
   const today = new Date();
   const reference = new Date(Date.UTC(DEMO_YEAR, today.getMonth(), today.getDate()));
-  const currentWeekStart = startOfWeekMonday(reference);
   const todayKey = dateKey(reference);
   const appointments: DemoAppointmentConfig[] = [];
 
   for (let dayOffset = 0; dayOffset < 14; dayOffset += 1) {
-    const day = addDays(currentWeekStart, dayOffset);
+    const day = addDays(reference, dayOffset);
     const dayId = dateKey(day);
     const monthDay = formatMonthDay(day);
 
@@ -1390,20 +1389,12 @@ function timeOnDate(year: number, monthDay: string, time: string) {
 function assertDemoBusinessTime(monthDay: string, time: string, hour: number, minute: number) {
   const minutes = hour * 60 + minute;
   if (minutes < DEMO_BUSINESS_START_MINUTES || minutes > DEMO_BUSINESS_END_MINUTES) {
-    throw new Error(`Demo appointment ${monthDay} ${time} is outside the 02:00-19:00 window`);
+    throw new Error(`Demo appointment ${monthDay} ${time} is outside the 09:00-19:00 window`);
   }
 }
 
 function addMinutes(isoDate: string, minutes: number) {
   return new Date(new Date(isoDate).getTime() + minutes * 60_000).toISOString();
-}
-
-function startOfWeekMonday(date: Date) {
-  const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = value.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  value.setUTCDate(value.getUTCDate() + diff);
-  return value;
 }
 
 function addDays(date: Date, days: number) {
