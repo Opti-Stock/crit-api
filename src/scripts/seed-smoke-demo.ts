@@ -10,78 +10,80 @@ import { withTenantTransaction } from "../shared/db/tenant-transaction.js";
 const TENANT_CODE = process.env.DEMO_TENANT_CODE?.trim().toUpperCase() || "CRIT-OCC-01";
 const DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD || "DemoPassword123";
 const DEMO_YEAR = Number(process.env.DEMO_YEAR || "2026");
+const DEMO_BUSINESS_START_MINUTES = 7 * 60;
+const DEMO_BUSINESS_END_MINUTES = 19 * 60;
 
 const DEMO_CLINICS = [
   {
     key: "norte",
-    name: "Smoke Norte Medicina",
+    name: "CRIT Medicina Fisica Norte",
     specialization: "Medicina fisica y rehabilitacion",
     capacity: 6,
     rooms: [
-      { key: "norte-consultorio-1", name: "Smoke Norte Consultorio 1", capacity: 1 },
-      { key: "norte-consultorio-2", name: "Smoke Norte Consultorio 2", capacity: 1 },
-      { key: "norte-sala-terapia", name: "Smoke Norte Sala Terapia", capacity: 4 }
+      { key: "norte-consultorio-1", name: "Consultorio 1 Medicina Norte", capacity: 1 },
+      { key: "norte-consultorio-2", name: "Consultorio 2 Medicina Norte", capacity: 1 },
+      { key: "norte-sala-terapia", name: "Sala de Terapia Norte", capacity: 4 }
     ]
   },
   {
     key: "sur",
-    name: "Smoke Sur Terapia",
+    name: "CRIT Terapia Fisica Sur",
     specialization: "Terapia fisica y ocupacional",
     capacity: 8,
     rooms: [
-      { key: "sur-consultorio", name: "Smoke Sur Consultorio", capacity: 1 },
-      { key: "sur-terapia-a", name: "Smoke Sur Terapia A", capacity: 3 },
-      { key: "sur-terapia-b", name: "Smoke Sur Terapia B", capacity: 4 }
+      { key: "sur-consultorio", name: "Consultorio de Valoracion Sur", capacity: 1 },
+      { key: "sur-terapia-a", name: "Gimnasio de Terapia A", capacity: 3 },
+      { key: "sur-terapia-b", name: "Gimnasio de Terapia B", capacity: 4 }
     ]
   },
   {
     key: "infantil",
-    name: "Smoke Infantil Lenguaje",
+    name: "CRIT Lenguaje y Neurodesarrollo",
     specialization: "Lenguaje y neurodesarrollo",
     capacity: 5,
     rooms: [
-      { key: "infantil-lenguaje", name: "Smoke Infantil Lenguaje", capacity: 2 },
-      { key: "infantil-estimulacion", name: "Smoke Infantil Estimulacion", capacity: 3 }
+      { key: "infantil-lenguaje", name: "Consultorio de Lenguaje", capacity: 2 },
+      { key: "infantil-estimulacion", name: "Sala de Estimulacion Temprana", capacity: 3 }
     ]
   }
 ] as const;
 
 const DEMO_USERS = [
-  { key: "admin", role: "admin", email: "demo.admin@crit.test", fullName: "Demo Admin General", clinicKeys: ["all"] },
-  { key: "direccion", role: "direccion", email: "demo.direccion@crit.test", fullName: "Demo Direccion Todas Clinicas", clinicKeys: ["all"] },
+  { key: "admin", role: "admin", email: "demo.admin@crit.test", fullName: "Andrea Morales Torres", clinicKeys: ["all"] },
+  { key: "direccion", role: "direccion", email: "demo.direccion@crit.test", fullName: "Fernando Rivas Camacho", clinicKeys: ["all"] },
   {
     key: "recepcion_general",
     role: "recepcion_general",
     email: "demo.recepcion.general@crit.test",
-    fullName: "Demo Recepcion General Checkin Global",
+    fullName: "Laura Jimenez Prado",
     clinicKeys: ["all"]
   },
   {
     key: "recepcion_norte",
     role: "recepcion",
     email: "demo.recepcion.norte@crit.test",
-    fullName: "Demo Recepcion Norte",
+    fullName: "Mariana Perez Salas",
     clinicKeys: ["norte"]
   },
   {
     key: "recepcion_sur",
     role: "recepcion",
     email: "demo.recepcion.sur@crit.test",
-    fullName: "Demo Recepcion Sur",
+    fullName: "Sofia Herrera Lopez",
     clinicKeys: ["sur"]
   },
   {
     key: "recepcion_infantil",
     role: "recepcion",
     email: "demo.recepcion.infantil@crit.test",
-    fullName: "Demo Recepcion Infantil",
+    fullName: "Claudia Navarro Ruiz",
     clinicKeys: ["infantil"]
   },
   {
     key: "coordinador_norte",
     role: "coordinador",
     email: "demo.coordinador.norte@crit.test",
-    fullName: "Demo Coordinador Norte",
+    fullName: "Jorge Castillo Mendoza",
     specialty: "Coordinacion medicina fisica",
     clinicKeys: ["norte"]
   },
@@ -89,7 +91,7 @@ const DEMO_USERS = [
     key: "coordinador_sur",
     role: "coordinador",
     email: "demo.coordinador.sur@crit.test",
-    fullName: "Demo Coordinador Sur",
+    fullName: "Paola Sanchez Vega",
     specialty: "Coordinacion terapia fisica",
     clinicKeys: ["sur"]
   },
@@ -97,7 +99,7 @@ const DEMO_USERS = [
     key: "medico_norte",
     role: "medico",
     email: "demo.medico.norte@crit.test",
-    fullName: "Demo Medico Norte",
+    fullName: "Dr. Ricardo Aguilar Medina",
     specialty: "Medicina fisica norte",
     clinicKeys: ["norte"]
   },
@@ -105,7 +107,7 @@ const DEMO_USERS = [
     key: "medico_multi",
     role: "medico",
     email: "demo.medico.multi@crit.test",
-    fullName: "Demo Medico Multi Clinica",
+    fullName: "Dra. Natalia Fuentes Lara",
     specialty: "Medicina fisica multi clinica",
     clinicKeys: ["norte", "sur", "infantil"]
   },
@@ -113,7 +115,7 @@ const DEMO_USERS = [
     key: "terapeuta_sur",
     role: "terapeuta",
     email: "demo.terapeuta.sur@crit.test",
-    fullName: "Demo Terapeuta Sur",
+    fullName: "T.F. Daniela Ortega Cruz",
     specialty: "Terapia fisica sur",
     clinicKeys: ["sur"]
   },
@@ -121,7 +123,7 @@ const DEMO_USERS = [
     key: "terapeuta_infantil",
     role: "terapeuta",
     email: "demo.terapeuta.infantil@crit.test",
-    fullName: "Demo Terapeuta Infantil",
+    fullName: "T.L. Monica Reyes Pineda",
     specialty: "Terapia lenguaje infantil",
     clinicKeys: ["infantil"]
   },
@@ -129,7 +131,7 @@ const DEMO_USERS = [
     key: "acompanamiento_norte",
     role: "personal_acompanamiento",
     email: "demo.acompanamiento.norte@crit.test",
-    fullName: "Demo AP Norte",
+    fullName: "Victor Salazar Nunez",
     specialty: "Acompanamiento norte",
     clinicKeys: ["norte"]
   },
@@ -137,7 +139,7 @@ const DEMO_USERS = [
     key: "acompanamiento_sur",
     role: "personal_acompanamiento",
     email: "demo.acompanamiento.sur@crit.test",
-    fullName: "Demo AP Sur",
+    fullName: "Elena Cardenas Soto",
     specialty: "Acompanamiento sur",
     clinicKeys: ["sur"]
   },
@@ -145,16 +147,16 @@ const DEMO_USERS = [
     key: "familia",
     role: "paciente_familia",
     email: "demo.familia@crit.test",
-    fullName: "Demo Familia Paciente Norte",
+    fullName: "Gabriela Lopez Martinez",
     clinicKeys: []
   },
   // Backward-compatible aliases used by earlier smoke docs.
-  { key: "recepcion_legacy", role: "recepcion", email: "demo.recepcion@crit.test", fullName: "Demo Recepcion Legacy Norte", clinicKeys: ["norte"] },
+  { key: "recepcion_legacy", role: "recepcion", email: "demo.recepcion@crit.test", fullName: "Rosa Martinez Leon", clinicKeys: ["norte"] },
   {
     key: "coordinador_legacy",
     role: "coordinador",
     email: "demo.coordinador@crit.test",
-    fullName: "Demo Coordinador Legacy Norte",
+    fullName: "Miguel Angel Campos",
     specialty: "Coordinacion legacy",
     clinicKeys: ["norte"]
   },
@@ -162,7 +164,7 @@ const DEMO_USERS = [
     key: "medico_legacy",
     role: "medico",
     email: "demo.medico@crit.test",
-    fullName: "Demo Medico Legacy Norte",
+    fullName: "Dr. Carlos Mendez Flores",
     specialty: "Medicina fisica legacy",
     clinicKeys: ["norte"]
   },
@@ -170,7 +172,7 @@ const DEMO_USERS = [
     key: "terapeuta_legacy",
     role: "terapeuta",
     email: "demo.terapeuta@crit.test",
-    fullName: "Demo Terapeuta Legacy Sur",
+    fullName: "T.F. Alejandra Torres Diaz",
     specialty: "Terapia fisica legacy",
     clinicKeys: ["sur"]
   },
@@ -178,7 +180,7 @@ const DEMO_USERS = [
     key: "acompanamiento_legacy",
     role: "personal_acompanamiento",
     email: "demo.acompanamiento@crit.test",
-    fullName: "Demo Acompanamiento Legacy",
+    fullName: "Patricia Gomez Rivera",
     specialty: "Acompanamiento legacy",
     clinicKeys: ["norte"]
   }
@@ -188,7 +190,7 @@ const DEMO_PATIENTS = [
   {
     key: "norte_asiste",
     externalId: "DEMO-PAT-NORTE-001",
-    fullName: "Paciente Smoke Norte Asistencia",
+    fullName: "Mateo Lopez Garcia",
     birthDate: "2014-05-10",
     phone: "5550101001",
     email: "paciente.norte.asistencia@crit.test",
@@ -198,7 +200,7 @@ const DEMO_PATIENTS = [
   {
     key: "norte_falta",
     externalId: "DEMO-PAT-NORTE-002",
-    fullName: "Paciente Smoke Norte Inasistencia",
+    fullName: "Valentina Hernandez Ruiz",
     birthDate: "2012-09-18",
     phone: "5550101002",
     email: "paciente.norte.inasistencia@crit.test",
@@ -208,7 +210,7 @@ const DEMO_PATIENTS = [
   {
     key: "sur_checkin",
     externalId: "DEMO-PAT-SUR-001",
-    fullName: "Paciente Smoke Sur Checkin Pendiente Asistencia",
+    fullName: "Santiago Ramirez Torres",
     birthDate: "2015-03-12",
     phone: "5550101003",
     email: "paciente.sur.checkin@crit.test",
@@ -218,7 +220,7 @@ const DEMO_PATIENTS = [
   {
     key: "sur_reagenda",
     externalId: "DEMO-PAT-SUR-002",
-    fullName: "Paciente Smoke Sur Solicitud Reagendar",
+    fullName: "Camila Martinez Flores",
     birthDate: "2011-11-08",
     phone: "5550101004",
     email: "paciente.sur.reagenda@crit.test",
@@ -228,7 +230,7 @@ const DEMO_PATIENTS = [
   {
     key: "infantil_lenguaje",
     externalId: "DEMO-PAT-INF-001",
-    fullName: "Paciente Smoke Infantil Lenguaje",
+    fullName: "Emiliano Sanchez Perez",
     birthDate: "2017-02-20",
     phone: "5550101005",
     email: "paciente.infantil.lenguaje@crit.test",
@@ -238,7 +240,7 @@ const DEMO_PATIENTS = [
   {
     key: "infantil_futuro",
     externalId: "DEMO-PAT-INF-002",
-    fullName: "Paciente Smoke Infantil Futuro",
+    fullName: "Renata Gutierrez Morales",
     birthDate: "2018-07-01",
     phone: "5550101006",
     email: "paciente.infantil.futuro@crit.test",
@@ -248,7 +250,7 @@ const DEMO_PATIENTS = [
   {
     key: "cancelada",
     externalId: "DEMO-PAT-CAN-001",
-    fullName: "Paciente Smoke Cita Cancelada",
+    fullName: "Diego Torres Navarro",
     birthDate: "2013-12-02",
     phone: "5550101007",
     email: "paciente.cancelada@crit.test",
@@ -258,7 +260,7 @@ const DEMO_PATIENTS = [
   {
     key: "sin_citas",
     externalId: "DEMO-PAT-SIN-001",
-    fullName: "Paciente Smoke Valido Sin Citas",
+    fullName: "Lucia Vargas Mendoza",
     birthDate: "2016-10-15",
     phone: "5550101008",
     email: "paciente.sin.citas@crit.test",
@@ -268,10 +270,10 @@ const DEMO_PATIENTS = [
 ] as const;
 
 const DEMO_APPOINTMENT_TYPES = [
-  { key: "medicina", name: "Smoke Medicina Fisica", duration: 45 },
-  { key: "terapia_fisica", name: "Smoke Terapia Fisica", duration: 50 },
-  { key: "lenguaje", name: "Smoke Terapia Lenguaje", duration: 40 },
-  { key: "valoracion", name: "Smoke Valoracion Inicial", duration: 60 }
+  { key: "medicina", name: "Consulta de Medicina Fisica", duration: 45 },
+  { key: "terapia_fisica", name: "Sesion de Terapia Fisica", duration: 50 },
+  { key: "lenguaje", name: "Terapia de Lenguaje", duration: 40 },
+  { key: "valoracion", name: "Valoracion Inicial", duration: 60 }
 ] as const;
 
 type DemoUserKey = (typeof DEMO_USERS)[number]["key"];
@@ -602,7 +604,7 @@ async function seedSmokeDemo() {
       await setCurrentUser(client, users.acompanamiento_norte.id);
       await upsertHandoffNote(client, tenantId, {
         appointment: appointments[appointmentConfig.key],
-        title: `Smoke enlace ${appointmentConfig.key}`,
+        title: `Seguimiento operativo ${appointmentConfig.key}`,
         createdByUserId: users.acompanamiento_norte.id,
         recipientUserIds: handoffRecipients
       });
@@ -610,13 +612,13 @@ async function seedSmokeDemo() {
 
     await upsertNotification(client, tenantId, users.terapeuta_sur.id, {
       type: "pending_note",
-      title: "Smoke: nota medica pendiente",
+      title: "Nota medica pendiente",
       message: "Notificacion demo para validar contador de terapeuta.",
       metadata: buildAppointmentNotificationMetadata(appointments.junio_presente_norte, "pending_note")
     });
     await upsertNotification(client, tenantId, users.recepcion_general.id, {
       type: "appointment_change",
-      title: "Smoke: solicitud de reagendar",
+      title: "Solicitud de reagendar",
       message: "Notificacion demo para recepcion general.",
       metadata: buildAppointmentNotificationMetadata(appointments.julio_reagendar_sur, "reschedule")
     });
@@ -1270,7 +1272,7 @@ async function upsertHandoffNote(
       noteId,
       input.appointment.patientId,
       input.createdByUserId,
-      `Nota de enlace smoke para ${input.title}. Validar destinatarios, notificaciones y conversacion.`
+      `Nota de enlace demo para ${input.title}. Validar destinatarios, notificaciones y conversacion.`
     ]
   );
 
@@ -1283,8 +1285,8 @@ async function upsertHandoffNote(
     );
     await upsertNotification(client, tenantId, recipientUserId, {
       type: "handoff_note_received",
-      title: `Smoke: ${input.title}`,
-      message: "Tienes una nota de enlace smoke pendiente de lectura.",
+      title: input.title,
+      message: "Tienes una nota de enlace pendiente de lectura.",
       metadata: {
         target: {
           type: "handoff_note",
@@ -1377,7 +1379,15 @@ function requireCollaborator(user: DemoUser) {
 function timeOnDate(year: number, monthDay: string, time: string) {
   const [month, day] = monthDay.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);
+  assertDemoBusinessTime(monthDay, time, hour, minute);
   return new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0)).toISOString();
+}
+
+function assertDemoBusinessTime(monthDay: string, time: string, hour: number, minute: number) {
+  const minutes = hour * 60 + minute;
+  if (minutes < DEMO_BUSINESS_START_MINUTES || minutes > DEMO_BUSINESS_END_MINUTES) {
+    throw new Error(`Demo appointment ${monthDay} ${time} is outside the 07:00-19:00 window`);
+  }
 }
 
 function addMinutes(isoDate: string, minutes: number) {
