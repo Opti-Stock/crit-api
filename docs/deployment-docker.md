@@ -18,7 +18,7 @@ Cada servicio necesita las mismas variables base del proyecto:
 ```txt
 DATABASE_URL=postgres://...
 JWT_SECRET=...
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:5173,https://crit-assist-demo.onrender.com
 MAIN_API_PORT=3000
 ADMIN_API_PORT=3001
 CHECKIN_API_PORT=3002

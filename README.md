@@ -75,9 +75,10 @@ Las variables completas y sus defaults viven en `.env.example`.
 La URL y el token de la API CRIT pueden quedar vacios para levantar las APIs.
 Son obligatorios solamente al iniciar el worker.
 
-`CORS_ORIGIN` tiene default local `http://localhost:5173`, se valida como URL
-y queda preparado para una politica restrictiva; las tres apps usan actualmente
-la configuracion por defecto de `cors()`.
+`CORS_ORIGIN` tiene default local `http://localhost:5173` y acepta una o mas
+URLs separadas por coma, por ejemplo
+`http://localhost:5173,https://crit-assist-demo.onrender.com`. Las apps solo
+responden con headers CORS para esos origenes permitidos.
 
 ## Ejecutar las aplicaciones
 

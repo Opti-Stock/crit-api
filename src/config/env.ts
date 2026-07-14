@@ -3,6 +3,15 @@ import { z } from "zod";
 
 const portSchema = z.coerce.number().int().min(1).max(65_535);
 const positiveIntegerSchema = z.coerce.number().int().positive();
+const corsOriginSchema = z.string().min(1).refine(
+  (value) =>
+    value
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .every((origin) => z.url().safeParse(origin).success),
+  "CORS_ORIGIN must be one or more comma-separated URLs"
+);
 
 const envSchema = z
   .object({
@@ -40,7 +49,7 @@ const envSchema = z
       z.string().transform((value) => value.trim().toLowerCase()).pipe(z.email())
     ]).default(""),
     PLATFORM_BOOTSTRAP_PASSWORD: z.union([z.literal(""), z.string().min(12).max(72)]).default(""),
-    CORS_ORIGIN: z.url().default("http://localhost:5173"),
+    CORS_ORIGIN: corsOriginSchema.default("http://localhost:5173"),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
     CRIT_POST_API_TOKEN: z.string().default(""),
     CRIT_POST_API_POLL_INTERVAL_MS: positiveIntegerSchema.default(5_000),
