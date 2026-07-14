@@ -129,7 +129,7 @@ docker run --rm `
   -e PLATFORM_DB_PASSWORD `
   -v "${PWD}:/work" `
   -w /work `
-  postgres:16-alpine `
+  postgres:16 `
   sh -lc '
 set -Eeuo pipefail
 
@@ -624,4 +624,3 @@ Si quieren probar el POST institucional:
    ```
 
 7. Da click en `Create Background Worker`.
-
