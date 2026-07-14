@@ -203,6 +203,12 @@ El payload es provisional y versionado. Solo contiene identificadores y estado
 operativo; no incluye nombres, contacto, notas medicas ni contenido clinico.
 Detalles en [`docs/crit-api-integration.md`](docs/crit-api-integration.md).
 
+## Despliegue demo
+
+Para publicar el MVP en Render con `crit-db`, los servicios de `crit-api`, el
+worker opcional y `crit-front`, usar la guia en
+[`docs/render-deployment.md`](docs/render-deployment.md).
+
 ## Validaciones
 
 ```powershell
