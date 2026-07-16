@@ -1,17 +1,9 @@
 # Auth module
 
-Provides authentication for the main API through `POST /api/auth/login`.
+Provides operational login, logout and session inspection through `/api/auth`.
 
-The module follows `routes -> controller -> service -> repository -> PostgreSQL`.
-Email addresses are normalized before lookup. The tenant is resolved internally
-from a unique active user email in an active tenant; ambiguous emails are rejected
-with the same generic authentication error.
+The module follows `routes -> controller -> service -> repository -> PostgreSQL`. Email is normalized and the tenant is resolved from one unique active account. Missing, inactive, ambiguous and invalid-password accounts return the same error.
 
-Successful authentication returns an HS256 access token containing the user ID,
-tenant ID, and role names. Invalid user, status, password, and ambiguous email
-combinations all produce the same response so the endpoint does not reveal
-account existence or tenant membership.
+The service signs an HS256 JWT containing user ID, tenant ID and roles. The HTTP controller places it in the `crit_session` HttpOnly cookie and returns only profile data and expiration. `GET /api/auth/me` accepts that cookie; technical Bearer authentication is optional by environment. `POST /api/auth/logout` clears the browser cookie.
 
-`GET /api/auth/me` validates a Bearer token and returns its authenticated context.
-Protected routes derive the tenant exclusively from that context. Shared middleware
-also provides role checks for operational and administrative modules.
+Tenant selectors supplied through body, query or `x-tenant-id` are rejected. Authorization and PostgreSQL RLS remain mandatory for every protected operation.

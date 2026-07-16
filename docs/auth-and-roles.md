@@ -18,9 +18,9 @@ Invalid user, inactive user, inactive tenant, ambiguous email, and password
 combinations return the same `INVALID_CREDENTIALS` response. Password hashes are
 internal repository data and must never be returned or logged.
 
-Successful login returns an HS256 access token. Its subject is the user ID, and
-its private claims contain `tenantId` and the user's active role names. Tokens use
-the configured expiration, issuer, and audience:
+Successful login creates an HS256 access token whose subject is the user ID and
+whose private claims contain `tenantId` and active roles. The controller stores
+it in the `crit_session` HttpOnly cookie and returns only profile data and expiration:
 
 ```dotenv
 JWT_SECRET=replace_with_at_least_32_characters
@@ -59,9 +59,11 @@ JWT_AUDIENCE=crit-assist
 
 ## Protected routes
 
-Protected routes require `Authorization: Bearer <token>`. Tokens are accepted only
-with HS256, the configured issuer and audience, a valid expiration, a UUID subject,
-a UUID `tenantId`, and a role-name array.
+Protected browser routes require the HttpOnly session cookie. Optional
+`Authorization: Bearer <token>` support is restricted to technical integrations
+and controlled by `BEARER_AUTH_ENABLED`. Tokens are accepted only with HS256,
+the configured issuer and audience, a valid expiration, a UUID subject, a UUID
+`tenantId`, and a role-name array.
 
 `GET /api/auth/me` returns the authenticated `userId`, `tenantId`, and roles.
 Repositories must use this tenant context; protected endpoints reject `tenantId`,
@@ -89,7 +91,7 @@ last active administrator cannot be deactivated or lose the `admin` role.
 
 The platform super admin is not a tenant user and does not use tenant roles.
 It authenticates through `POST /super-admin/auth/login` with email and password,
-receives a platform-scoped JWT, and can create CRIT tenants plus the first
+receives a separate `crit_platform_session` HttpOnly cookie, and can create CRIT tenants plus the first
 tenant admin through `super-admin-api`.
 
 The platform database role is intentionally separate from `crit_app`. It can
@@ -114,8 +116,7 @@ operational scope of roles such as `recepcion` and `coordinador`. A user with
 well as operational records in assigned clinics, while medical-note content
 still requires the clinical role and clinical RLS context.
 
-The MVP does not persist sessions, refresh tokens, revocation lists, or logout
-state. Deactivating a user does not invalidate an already issued token. An
-emergency global revocation requires rotating `JWT_SECRET` and restarting both
-API processes; otherwise existing tokens remain valid until their original
-expiration.
+The MVP does not persist refresh tokens or revocation lists. Logout clears the
+browser cookie but cannot revoke a copied technical token. Deactivating a user
+does not invalidate an already issued token. Emergency global revocation requires
+rotating the relevant JWT secret and restarting API processes.

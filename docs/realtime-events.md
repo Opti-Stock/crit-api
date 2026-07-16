@@ -2,13 +2,13 @@
 
 ## Estado MVP
 
-El frontend ya contiene puntos de extension para eventos en tiempo real, pero el backend aun no expone SSE/WebSocket autenticado. Para evitar datos duplicados o filtrado incorrecto, el contrato recomendado es SSE autenticado por JWT.
+El backend expone SSE autenticado mediante la misma cookie HttpOnly de la sesión operativa.
 
 ## Endpoint propuesto
 
 ```txt
 GET /api/realtime/events
-Authorization: Bearer <jwt>
+Cookie: crit_session=<HttpOnly>
 ```
 
 ## Reglas de autorizacion

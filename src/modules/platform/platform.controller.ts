@@ -11,13 +11,22 @@ import {
   tenantIdParamsSchema,
   updateTenantSchema
 } from "./platform.validation.js";
+import { clearSessionCookie, PLATFORM_SESSION_COOKIE, setSessionCookie } from "../../config/cookies.js";
 
 export class PlatformController {
   constructor(private readonly service = new PlatformService()) {}
 
   readonly login: RequestHandler = async (request, response) => {
     const input = parseWithSchema(platformLoginSchema, request.body);
-    sendSuccess(response, await this.service.login(input));
+    const result = await this.service.login(input);
+    setSessionCookie(response, PLATFORM_SESSION_COOKIE, result.accessToken);
+    const { accessToken: _accessToken, tokenType: _tokenType, ...publicSession } = result;
+    sendSuccess(response, publicSession);
+  };
+
+  readonly logout: RequestHandler = (_request, response) => {
+    clearSessionCookie(response, PLATFORM_SESSION_COOKIE);
+    response.status(204).send();
   };
 
   readonly me: RequestHandler = async (request, response) => {

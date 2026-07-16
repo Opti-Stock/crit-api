@@ -3,6 +3,8 @@ import jwt, { type VerifyOptions } from "jsonwebtoken";
 import { z } from "zod";
 
 import { UnauthorizedError } from "../shared/errors/app-error.js";
+import { readCookie, SESSION_COOKIE } from "../config/cookies.js";
+import { env } from "../config/env.js";
 import type { AuthenticatedRequestContext } from "../types/global.js";
 
 export interface AuthenticationConfig {
@@ -36,14 +38,15 @@ export function createAuthenticationMiddleware(
   return (request, _response, next) => {
     const authorization = request.header("authorization");
     const match = authorization?.match(/^Bearer\s+([^\s]+)$/i);
+    const token = readCookie(request, SESSION_COOKIE) ?? (env.BEARER_AUTH_ENABLED ? match?.[1] : undefined);
 
-    if (!match) {
+    if (!token) {
       next(authenticationError());
       return;
     }
 
     try {
-      const decoded = jwt.verify(match[1], config.secret, verifyOptions);
+      const decoded = jwt.verify(token, config.secret, verifyOptions);
       const parsed = accessTokenSchema.safeParse(decoded);
 
       if (!parsed.success) {

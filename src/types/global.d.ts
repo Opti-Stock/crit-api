@@ -11,6 +11,7 @@ export interface PlatformAuthenticatedRequestContext {
 declare global {
   namespace Express {
     interface Request {
+      requestId: string;
       auth?: AuthenticatedRequestContext;
       platformAuth?: PlatformAuthenticatedRequestContext;
     }

@@ -1,24 +1,26 @@
-import cors from "cors";
 import express from "express";
-import helmet from "helmet";
 
-import { corsOptions } from "../../config/cors.js";
+import { configureApi } from "../../config/configure-api.js";
+import { registerHealthEndpoints } from "../../config/health.js";
+import { platformPool } from "../../config/platform-db.js";
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
 import { platformRouter } from "../../modules/platform/platform.routes.js";
+import { createOpenApiRouter } from "../../openapi/openapi.js";
+import { platformOperations } from "../../openapi/operations.js";
+import { authenticatePlatformRequest } from "../../middlewares/platform-authentication.middleware.js";
 
 export const app = express();
 
-app.use(helmet());
-app.use(cors(corsOptions));
-app.use(express.json());
-
-app.get("/health", (_request, response) => {
-  response.status(200).json({
-    status: "ok",
-    service: "super-admin-api"
-  });
-});
+configureApi(app);
+registerHealthEndpoints(app, "super-admin-api", platformPool);
+app.use("/super-admin", createOpenApiRouter({
+  title: "CRIT Assist Platform API",
+  description: "Cross-tenant platform administration API.",
+  operations: platformOperations,
+  authorize: [authenticatePlatformRequest],
+  cookieName: "crit_platform_session"
+}));
 
 app.use("/super-admin", platformRouter);
 

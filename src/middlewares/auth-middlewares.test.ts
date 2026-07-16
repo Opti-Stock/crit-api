@@ -8,6 +8,7 @@ import { AppError } from "../shared/errors/app-error.js";
 import { createAuthenticationMiddleware } from "./authentication.middleware.js";
 import { requireRoles } from "./role.middleware.js";
 import { requireTenantContext } from "./tenant.middleware.js";
+import { requireTrustedOrigin } from "./origin-protection.middleware.js";
 
 const config = {
   secret: "test-secret-that-is-at-least-32-characters-long",
@@ -23,15 +24,21 @@ function createRequest(options: {
   body?: unknown;
   query?: Record<string, unknown>;
   tenantHeader?: string;
+  cookie?: string;
+  origin?: string;
+  method?: string;
 } = {}): Request {
   const headers: Record<string, string | undefined> = {
     authorization: options.authorization,
+    cookie: options.cookie,
+    origin: options.origin,
     "x-tenant-id": options.tenantHeader
   };
 
   return {
     body: options.body ?? {},
     query: options.query ?? {},
+    method: options.method ?? "GET",
     header: (name: string) => headers[name.toLowerCase()]
   } as Request;
 }
@@ -69,6 +76,26 @@ test("authentication attaches only validated JWT context", async () => {
 
   assert.equal(error, undefined);
   assert.deepEqual(request.auth, { userId, tenantId, roles: ["admin"] });
+});
+
+test("authentication accepts the HttpOnly session cookie", async () => {
+  const request = createRequest({ cookie: `crit_session=${signToken()}` });
+  const error = await runMiddleware(createAuthenticationMiddleware(config), request);
+
+  assert.equal(error, undefined);
+  assert.deepEqual(request.auth, { userId, tenantId, roles: ["admin"] });
+});
+
+test("cookie-authenticated mutations reject an untrusted origin", async () => {
+  const request = createRequest({
+    cookie: `crit_session=${signToken()}`,
+    origin: "https://malicious.example",
+    method: "POST"
+  });
+  const error = await runMiddleware(requireTrustedOrigin, request);
+
+  assert.ok(error instanceof AppError);
+  assert.equal(error.code, "UNTRUSTED_ORIGIN");
 });
 
 test("authentication rejects absent, altered, expired, issuer, and audience tokens", async () => {
