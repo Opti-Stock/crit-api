@@ -13,6 +13,13 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      APP_ENV: local
+      NODE_ENV: test
+      DATABASE_URL: postgresql://crit_app:crit_app@127.0.0.1:5432/crit_db
+      PLATFORM_DATABASE_URL: postgresql://crit_platform_app:crit_platform_app@127.0.0.1:5432/crit_db
+      JWT_SECRET: ci-demo-jwt-secret-1234567890abcd
+      PLATFORM_JWT_SECRET: ci-demo-platform-jwt-secret-1234567890abcd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
