@@ -23,10 +23,12 @@
     "test:outbox-integration": "tsx src/scripts/test-outbox-integration.ts",
     "worker:crit-post-api": "tsx src/workers/crit-post-api.worker.ts",
     "worker:crit-post-api:once": "tsx src/workers/crit-post-api.worker.ts --once",
-    "lint": "echo \"Lint not configured yet\"",
+    "lint": "npm run typecheck && node scripts/check-security-contract.mjs",
+    "validate:openapi": "npm run build && node scripts/validate-openapi.mjs",
     "test": "tsx --test --test-isolation=none --test-concurrency=1 src/**/*.test.ts"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.0.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -35,6 +37,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
     "pg": "^8.21.0",
+    "swagger-ui-express": "^5.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -45,6 +48,7 @@
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
+    "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }

@@ -7,6 +7,7 @@ const allowedOrigins = env.CORS_ORIGIN.split(",")
   .filter(Boolean);
 
 export const corsOptions: CorsOptions = {
+  credentials: true,
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);

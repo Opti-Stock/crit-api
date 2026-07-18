@@ -26,6 +26,9 @@ API no crea tablas ni ejecuta DDL al iniciar.
 
 ## Preparacion local
 
+La guía canónica con comandos en orden, modo híbrido y modo Docker está en
+[`docs/local-development.md`](docs/local-development.md).
+
 1. Levantar PostgreSQL desde `crit-db`:
 
    ```powershell
@@ -38,8 +41,8 @@ API no crea tablas ni ejecuta DDL al iniciar.
 2. Instalar dependencias y crear la configuracion local:
 
    ```powershell
-   npm install
-   Copy-Item .env.example .env
+   npm ci
+   Copy-Item .env.local.example .env
    ```
 
 3. Sustituir en `.env` los placeholders de `JWT_SECRET`,
@@ -61,11 +64,11 @@ crear otro centro y su primer administrador estan en
 
 ## Variables de entorno
 
-Las variables completas y sus defaults viven en `.env.example`.
+Las variables completas se documentan en `.env.local.example`, `.env.render.example` y `.env.production.example`. Los archivos reales nunca se versionan.
 
 | Grupo | Variables |
 | --- | --- |
-| Apps | `NODE_ENV`, `MAIN_API_PORT`, `ADMIN_API_PORT`, `CHECKIN_API_PORT`, `SUPER_ADMIN_API_PORT`, `CORS_ORIGIN` |
+| Apps | `APP_ENV`, `NODE_ENV`, puertos, `CORS_ORIGIN`, `COOKIE_SECURE`, `OPENAPI_ENABLED`, `BEARER_AUTH_ENABLED` |
 | PostgreSQL | `DATABASE_URL` con `crit_app`, `PLATFORM_DATABASE_URL` con `crit_platform_app` |
 | JWT | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_ISSUER`, `JWT_AUDIENCE`, `PLATFORM_JWT_*` |
 | Passwords | `BCRYPT_SALT_ROUNDS` |
@@ -121,9 +124,9 @@ Content-Type: application/json
 
 La API resuelve internamente el tenant a partir de un email activo y unico en un
 tenant activo. Si el email es ambiguo entre tenants, el login responde el mismo
-`401` generico que una contrasena incorrecta. El access token contiene `userId`,
-`tenantId` y todos los roles activos. Las rutas protegidas usan
-`Authorization: Bearer <token>`. Nunca se acepta un `tenantId` enviado por body,
+`401` generico que una contrasena incorrecta. La API guarda el JWT en una cookie
+HttpOnly y devuelve solo el perfil y vencimiento. `Authorization: Bearer` queda
+reservado para integraciones tecnicas cuando se habilita por entorno. Nunca se acepta un `tenantId` enviado por body,
 query o `x-tenant-id` como fuente de autorizacion.
 
 Un usuario puede tener varios roles. Los permisos de ruta usan semantica OR y

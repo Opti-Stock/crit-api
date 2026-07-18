@@ -3,6 +3,7 @@ import jwt, { type SignOptions, type VerifyOptions } from "jsonwebtoken";
 import { z } from "zod";
 
 import { env } from "../config/env.js";
+import { PLATFORM_SESSION_COOKIE, readCookie } from "../config/cookies.js";
 import { UnauthorizedError } from "../shared/errors/app-error.js";
 
 export interface PlatformTokenConfig {
@@ -36,14 +37,15 @@ export function createPlatformAuthenticationMiddleware(
   return (request, _response, next) => {
     const authorization = request.header("authorization");
     const match = authorization?.match(/^Bearer\s+([^\s]+)$/i);
+    const token = readCookie(request, PLATFORM_SESSION_COOKIE) ?? (env.BEARER_AUTH_ENABLED ? match?.[1] : undefined);
 
-    if (!match) {
+    if (!token) {
       next(authenticationError());
       return;
     }
 
     try {
-      const decoded = jwt.verify(match[1], config.secret, verifyOptions);
+      const decoded = jwt.verify(token, config.secret, verifyOptions);
       const parsed = platformAccessTokenSchema.safeParse(decoded);
 
       if (!parsed.success) {

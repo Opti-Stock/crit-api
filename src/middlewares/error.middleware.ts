@@ -21,7 +21,9 @@ export const errorMiddleware: ErrorRequestHandler = (
   }
 
   console.error("Unhandled request error", {
-    ...serializeUnhandledError(error),
+    name: error instanceof Error ? error.name : "UnknownError",
+    code: readSafeErrorCode(error),
+    requestId: request.requestId,
     method: request.method,
     path: request.path
   });
@@ -34,40 +36,8 @@ export const errorMiddleware: ErrorRequestHandler = (
   );
 };
 
-function serializeUnhandledError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return {
-      name: "UnknownError",
-      message: String(error)
-    };
-  }
-
-  const errorWithCode = error as Error & {
-    code?: string;
-    cause?: unknown;
-    errors?: unknown[];
-  };
-
-  return {
-    name: error.name,
-    message: error.message,
-    code: errorWithCode.code,
-    cause: serializeNestedError(errorWithCode.cause),
-    errors: Array.isArray(errorWithCode.errors)
-      ? errorWithCode.errors.map(serializeNestedError)
-      : undefined
-  };
-}
-
-function serializeNestedError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return error === undefined ? undefined : String(error);
-  }
-
-  const nested = error as Error & { code?: string };
-  return {
-    name: nested.name,
-    message: nested.message,
-    code: nested.code
-  };
+function readSafeErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const code = (error as Error & { code?: unknown }).code;
+  return typeof code === "string" && /^[A-Z0-9_]{1,64}$/.test(code) ? code : undefined;
 }

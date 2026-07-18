@@ -1,0 +1,16 @@
+title = "CRIT API gitleaks configuration"
+
+[allowlist]
+description = "Allow fake credentials in docs and example config files"
+paths = [
+  '''^\.env\.example$''',
+  '''^\.env\.local\.example$''',
+  '''^\.env\.render\.example$''',
+  '''^\.env\.production\.example$''',
+  '''^docker-compose\.yml$''',
+  '''^docs/auth-and-roles\.md$''',
+  '''^docs/crit-api-integration\.md$''',
+  '''^docs/deployment-docker\.md$''',
+  '''^docs/render-deployment\.md$''',
+  '''^docs/tenant-onboarding\.md$'''
+]

@@ -15,6 +15,7 @@ const corsOriginSchema = z.string().min(1).refine(
 
 const envSchema = z
   .object({
+    APP_ENV: z.enum(["local", "render", "production"]).default("local"),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     MAIN_API_PORT: portSchema.default(3000),
     ADMIN_API_PORT: portSchema.default(3001),
@@ -50,6 +51,11 @@ const envSchema = z
     ]).default(""),
     PLATFORM_BOOTSTRAP_PASSWORD: z.union([z.literal(""), z.string().min(12).max(72)]).default(""),
     CORS_ORIGIN: corsOriginSchema.default("http://localhost:5173"),
+    COOKIE_SECURE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+    BEARER_AUTH_ENABLED: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
+    OPENAPI_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+    LOGIN_RATE_LIMIT_WINDOW_MS: positiveIntegerSchema.default(900_000),
+    LOGIN_RATE_LIMIT_MAX_REQUESTS: positiveIntegerSchema.default(10),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
     CRIT_POST_API_TOKEN: z.string().default(""),
     CRIT_POST_API_POLL_INTERVAL_MS: positiveIntegerSchema.default(5_000),
@@ -59,15 +65,21 @@ const envSchema = z
     CRIT_POST_API_PROCESSING_TIMEOUT_MS: positiveIntegerSchema.default(60_000)
   })
   .superRefine((values, context) => {
-    if (
-      values.NODE_ENV === "production" &&
-      values.JWT_SECRET === "replace_with_at_least_32_characters"
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["JWT_SECRET"],
-        message: "JWT_SECRET must be configured in production"
-      });
+    if (values.APP_ENV !== "local") {
+      const unsafeSecrets = [
+        ["JWT_SECRET", values.JWT_SECRET],
+        ["PLATFORM_JWT_SECRET", values.PLATFORM_JWT_SECRET]
+      ] as const;
+
+      for (const [name, value] of unsafeSecrets) {
+        if (/replace|change|example|secret/i.test(value)) {
+          context.addIssue({ code: "custom", path: [name], message: `${name} must use a deployment secret` });
+        }
+      }
+
+      if (!values.COOKIE_SECURE) {
+        context.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "Secure cookies are required outside local" });
+      }
     }
   });
 
