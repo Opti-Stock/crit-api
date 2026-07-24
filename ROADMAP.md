@@ -8,7 +8,8 @@
 - Measure Recall@12 and source support before enabling AI in the Render demo.
 - [x] Generate deterministic, explainable appointment recommendations.
 - [x] Revalidate manual and recommended slots with ordered advisory locks.
-- Add scheduling configuration CRUD and integrated database contract tests.
+- [x] Add clinic-scoped scheduling configuration CRUD with role checks.
+- Add integrated database contract tests for scheduling configuration.
 - Replace the in-process login limiter with a shared store before horizontal scaling.
 - Complete request and response schemas in the OpenAPI contract from module Zod schemas.
 - Add browser-driven role and privacy tests against the Render gateway.

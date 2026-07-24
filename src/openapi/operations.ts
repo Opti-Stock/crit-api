@@ -7,6 +7,20 @@ export const mainOperations: OpenApiOperation[] = [
   ...["patients", "collaborators", "clinics", "rooms"].flatMap((resource) => [op("get", `/api/${resource}`, `List ${resource}`, resource), op("get", `/api/${resource}/{id}`, `Get ${resource} item`, resource)]),
   op("get", "/api/calendar/appointment-types", "List appointment types", "Calendar"),
   op("post", "/api/appointments/recommendations", "Recommend explainable appointment slots", "Appointments", ["admin", "direccion", "recepcion", "coordinador"]),
+  ...[
+    "/api/scheduling/clinics/{clinicId}/operating-hours",
+    "/api/scheduling/clinics/{clinicId}/appointment-types",
+    "/api/scheduling/clinics/{clinicId}/collaborators/{collaboratorId}/appointment-types",
+    "/api/scheduling/clinics/{clinicId}/rooms/{roomId}/appointment-types"
+  ].flatMap((path) => [
+    op("get", path, "Read scheduling configuration", "Scheduling", ["admin", "coordinador"]),
+    op("put", path, "Replace scheduling configuration", "Scheduling", ["admin", "coordinador"])
+  ]),
+  op("get", "/api/scheduling/clinics/{clinicId}/blocks", "List scheduling blocks", "Scheduling", ["admin", "coordinador"]),
+  op("post", "/api/scheduling/clinics/{clinicId}/blocks", "Create a scheduling block", "Scheduling", ["admin", "coordinador"]),
+  op("delete", "/api/scheduling/clinics/{clinicId}/blocks/{blockId}", "Delete a scheduling block", "Scheduling", ["admin", "coordinador"]),
+  op("get", "/api/scheduling/clinics/{clinicId}/patients/{patientId}/preferences", "Read patient scheduling preferences", "Scheduling", ["admin", "recepcion", "coordinador"]),
+  op("put", "/api/scheduling/clinics/{clinicId}/patients/{patientId}/preferences", "Replace patient scheduling preferences", "Scheduling", ["admin", "recepcion", "coordinador"]),
   ...["appointments", "attendance", "medical-notes", "handoff-notes", "notifications"].flatMap((resource) => [op("get", `/api/${resource}`, `List ${resource}`, resource), op("get", `/api/${resource}/{id}`, `Get ${resource} item`, resource)]),
   op("post", "/api/appointments", "Create an appointment", "Appointments", ["recepcion", "coordinador"]), op("patch", "/api/appointments/{id}", "Update an appointment", "Appointments", ["recepcion", "coordinador"]),
   op("post", "/api/attendance", "Register attendance", "Attendance", ["medico", "terapeuta"]), op("patch", "/api/attendance/{id}", "Update attendance", "Attendance", ["medico", "terapeuta"]),
