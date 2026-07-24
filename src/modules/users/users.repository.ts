@@ -151,7 +151,7 @@ export class UsersRepository {
          WHERE tenant_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
         [tenantId, userId]
       );
-      await this.insertAdminAuditLog(client, tenantId, actorId, "users", userId, "soft_delete", reason);
+      await this.insertAdminAuditLog(client, "users", userId, "soft_delete", reason);
     }, this.databasePool);
   }
 
@@ -167,7 +167,7 @@ export class UsersRepository {
       );
       if ((result.rowCount ?? 0) === 0) throw new NotFoundError("User not found", "USER_NOT_FOUND");
       await this.syncCollaboratorForUser(client, tenantId, userId);
-      await this.insertAdminAuditLog(client, tenantId, actorId, "users", userId, "restore", reason);
+      await this.insertAdminAuditLog(client, "users", userId, "restore", reason);
       return (await this.findByIdWithClient(client, tenantId, userId, true))!;
     }, this.databasePool);
   }
@@ -394,26 +394,14 @@ export class UsersRepository {
 
   private async insertAdminAuditLog(
     client: PoolClient,
-    tenantId: string,
-    actorId: string,
     entityType: string,
     entityId: string,
     operation: "soft_delete" | "restore",
     reason?: string
   ) {
     await client.query(
-      `INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id, metadata)
-       VALUES ($1, $2, 'UPDATE', $3, $4, $5::jsonb)`,
-      [
-        tenantId,
-        actorId,
-        entityType,
-        entityId,
-        JSON.stringify({
-          operation,
-          ...(reason ? { reason } : {})
-        })
-      ]
+      "SELECT record_admin_audit($1, $2, $3, $4)",
+      [entityType, entityId, operation, reason ?? null]
     );
   }
 }
