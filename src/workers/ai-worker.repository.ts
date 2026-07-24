@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 
 import { pool } from "../config/db.js";
+import { env } from "../config/env.js";
 import { withTenantTransaction } from "../shared/db/tenant-transaction.js";
 import type { NoteKind } from "../modules/ai-assistance/ai-assistance.validation.js";
 
@@ -41,8 +42,8 @@ export class AiWorkerRepository {
         tenantId,
         workerId,
         status,
-        `${process.env.AI_EMBEDDING_MODEL_ID ?? "unknown"}@${process.env.AI_EMBEDDING_MODEL_REVISION ?? "unknown"}`,
-        `${process.env.AI_GENERATION_MODEL_ID ?? "unknown"}@${process.env.AI_GENERATION_MODEL_REVISION ?? "unknown"}`
+        `${env.AI_EMBEDDING_MODEL_ID}@${env.AI_EMBEDDING_MODEL_REVISION}`,
+        `${env.AI_GENERATION_MODEL_ID}@${env.AI_GENERATION_MODEL_REVISION}`
       ]
     ), pool);
   }
