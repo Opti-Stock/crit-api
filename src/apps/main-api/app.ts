@@ -6,6 +6,7 @@ import { pool } from "../../config/db.js";
 import { errorMiddleware } from "../../middlewares/error.middleware.js";
 import { notFoundMiddleware } from "../../middlewares/not-found.middleware.js";
 import { appointmentsRouter } from "../../modules/appointments/appointments.routes.js";
+import { aiAssistanceRouter } from "../../modules/ai-assistance/ai-assistance.routes.js";
 import { attendanceRouter } from "../../modules/attendance/attendance.routes.js";
 import { authRouter } from "../../modules/auth/auth.routes.js";
 import { calendarRouter } from "../../modules/calendar/calendar.routes.js";
@@ -34,6 +35,7 @@ app.use("/api", createOpenApiRouter({
 }));
 
 app.use("/api/auth", authRouter);
+app.use("/api", aiAssistanceRouter);
 app.use("/api/patients", patientsRouter);
 app.use("/api/collaborators", collaboratorsRouter);
 app.use("/api/clinics", clinicsRouter);

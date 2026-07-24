@@ -23,6 +23,9 @@
     "test:outbox-integration": "tsx src/scripts/test-outbox-integration.ts",
     "worker:crit-post-api": "tsx src/workers/crit-post-api.worker.ts",
     "worker:crit-post-api:once": "tsx src/workers/crit-post-api.worker.ts --once",
+    "worker:ai": "tsx src/workers/ai.worker.ts",
+    "worker:ai:once": "tsx src/workers/ai.worker.ts --once",
+    "ai:reindex": "tsx src/scripts/reindex-ai.ts",
     "lint": "npm run typecheck && node scripts/check-security-contract.mjs",
     "validate:openapi": "npm run build && node scripts/validate-openapi.mjs",
     "test": "tsx --test --test-isolation=none --test-concurrency=1 src/**/*.test.ts"
