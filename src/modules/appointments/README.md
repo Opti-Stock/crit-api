@@ -4,11 +4,13 @@ Este módulo pertenece a crit-api.
 
 ## Propósito
 
-Creación manual y listado de citas, montado en main-api (`/api/appointments`).
+Creación, reagendado y listado de citas, montado en main-api
+(`/api/appointments`).
 La FK compuesta `(tenant_id, collaborator_id, clinic_id)` en `crit-db` exige
 que el colaborador ya tenga membresía en esa clínica (`collaborator_clinics`);
 la FK de `room_id` exige que el cuarto pertenezca a esa misma clínica. El
-autosugerido de horarios (`collaborator_availability`) no se implementa aquí.
+El módulo `scheduling` genera recomendaciones; este módulo vuelve a validar sus
+restricciones al guardar.
 
 ## Visibilidad por rol
 
@@ -28,6 +30,15 @@ pueden crear citas dentro de `user_clinic_access`.
 - `GET /api/appointments/:appointmentId` — detalle.
 - `POST /api/appointments` — crea una cita. Roles: admin, direccion,
   recepcion, coordinador.
+- `PATCH /api/appointments/:appointmentId` — actualiza o reagenda una cita.
+- `POST /api/appointments/recommendations` — recomienda horarios disponibles
+  con puntuación y razones.
+
+La escritura toma bloqueos asesores ordenados para paciente, colaborador y sala.
+Los horarios manuales deben cumplir las mismas compatibilidades, duración,
+buffers, horarios, disponibilidad y bloqueos que una recomendación. Cuando una
+opción recomendada deja de estar disponible se devuelve
+`APPOINTMENT_RECOMMENDATION_STALE`.
 
 ## Estructura esperada al implementar
 

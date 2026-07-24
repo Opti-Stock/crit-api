@@ -17,6 +17,7 @@ import { notificationsRouter } from "../../modules/notifications/notifications.r
 import { patientsRouter } from "../../modules/patients/patients.routes.js";
 import { realtimeRouter } from "../../modules/realtime/realtime.routes.js";
 import { roomsRouter } from "../../modules/rooms/rooms.routes.js";
+import { schedulingRouter } from "../../modules/scheduling/scheduling.routes.js";
 import { createOpenApiRouter } from "../../openapi/openapi.js";
 import { mainOperations } from "../../openapi/operations.js";
 import { authenticateRequest } from "../../middlewares/auth.pipeline.js";
@@ -39,6 +40,7 @@ app.use("/api/collaborators", collaboratorsRouter);
 app.use("/api/clinics", clinicsRouter);
 app.use("/api/rooms", roomsRouter);
 app.use("/api/calendar", calendarRouter);
+app.use("/api", schedulingRouter);
 app.use("/api/appointments", appointmentsRouter);
 app.use("/api/attendance", attendanceRouter);
 app.use("/api/medical-notes", medicalNotesRouter);
