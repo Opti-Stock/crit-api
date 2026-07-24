@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { createAiModelRuntime } from "../ai/model-runtime.js";
+import { pool } from "../config/db.js";
 import { env } from "../config/env.js";
 import { AiWorkerProcessor } from "./ai-worker.processor.js";
 import { AiWorkerRepository } from "./ai-worker.repository.js";
@@ -23,44 +24,47 @@ let stopping = false;
 process.on("SIGTERM", () => { stopping = true; });
 process.on("SIGINT", () => { stopping = true; });
 
-do {
-  let processed = false;
-  for (const tenantId of tenantIds) {
-    await repository.heartbeat(tenantId, workerId, "healthy");
-    const job = await repository.claim(tenantId, workerId);
-    if (!job) continue;
-    processed = true;
-    const startedAt = Date.now();
-    try {
-      await processor.process(job);
-      await repository.complete(job);
-      process.stdout.write(`${JSON.stringify({
-        level: "info",
-        event: "ai_job_completed",
-        jobId: job.id,
-        jobType: job.type,
-        durationMs: Date.now() - startedAt
-      })}\n`);
-    } catch (error) {
-      const errorCode = error instanceof Error ? error.message : "AI_JOB_FAILED";
-      await repository.fail(job, errorCode);
-      process.stderr.write(`${JSON.stringify({
-        level: "error",
-        event: "ai_job_failed",
-        jobId: job.id,
-        jobType: job.type,
-        durationMs: Date.now() - startedAt,
-        errorCode: sanitizeErrorCode(errorCode)
-      })}\n`);
+try {
+  do {
+    let processed = false;
+    for (const tenantId of tenantIds) {
+      await repository.heartbeat(tenantId, workerId, "healthy");
+      const job = await repository.claim(tenantId, workerId);
+      if (!job) continue;
+      processed = true;
+      const startedAt = Date.now();
+      try {
+        await processor.process(job);
+        await repository.complete(job);
+        process.stdout.write(`${JSON.stringify({
+          level: "info",
+          event: "ai_job_completed",
+          jobId: job.id,
+          jobType: job.type,
+          durationMs: Date.now() - startedAt
+        })}\n`);
+      } catch (error) {
+        const errorCode = error instanceof Error ? error.message : "AI_JOB_FAILED";
+        await repository.fail(job, errorCode);
+        process.stderr.write(`${JSON.stringify({
+          level: "error",
+          event: "ai_job_failed",
+          jobId: job.id,
+          jobType: job.type,
+          durationMs: Date.now() - startedAt,
+          errorCode: sanitizeErrorCode(errorCode)
+        })}\n`);
+      }
     }
+    if (!once && !processed && !stopping) {
+      await new Promise((resolve) => setTimeout(resolve, env.AI_POLL_INTERVAL_MS));
+    }
+  } while (!once && !stopping);
+} finally {
+  for (const tenantId of tenantIds) {
+    await repository.heartbeat(tenantId, workerId, "stopping");
   }
-  if (!once && !processed && !stopping) {
-    await new Promise((resolve) => setTimeout(resolve, env.AI_POLL_INTERVAL_MS));
-  }
-} while (!once && !stopping);
-
-for (const tenantId of tenantIds) {
-  await repository.heartbeat(tenantId, workerId, "stopping");
+  await pool.end();
 }
 
 function sanitizeErrorCode(value: string) {
