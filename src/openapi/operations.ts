@@ -14,6 +14,13 @@ export const mainOperations: OpenApiOperation[] = [
   op("post", "/api/handoff-notes", "Create a handoff note", "Handoff notes", ["personal_acompanamiento"]), op("patch", "/api/handoff-notes/{id}/read", "Mark a handoff note as read", "Handoff notes"),
   op("post", "/api/notifications", "Create an internal notification", "Notifications", ["admin", "direccion"]), op("patch", "/api/notifications/{id}/read", "Mark notification as read", "Notifications"), op("patch", "/api/notifications/{id}/unread", "Mark notification as unread", "Notifications"),
   op("get", "/api/realtime/events", "Stream operational events", "Realtime")
+  ,op("post", "/api/patients/{patientId}/note-summaries", "Request a note-history summary", "AI assistance")
+  ,op("get", "/api/patients/{patientId}/note-summaries/latest", "Read the latest note-history summary", "AI assistance")
+  ,op("get", "/api/note-summaries/{summaryId}", "Read a note-history summary", "AI assistance")
+  ,op("post", "/api/patients/{patientId}/ai-questions", "Ask an evidence-backed history question", "AI assistance")
+  ,op("get", "/api/ai-interactions/{interactionId}", "Read an AI interaction", "AI assistance")
+  ,op("get", "/api/patients/{patientId}/ai-interactions", "List protected AI interactions", "AI assistance")
+  ,op("post", "/api/ai-interactions/{interactionId}/feedback", "Rate an AI interaction", "AI assistance")
 ];
 
 export const adminOperations: OpenApiOperation[] = [

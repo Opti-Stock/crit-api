@@ -3,6 +3,8 @@ import { z } from "zod";
 
 const portSchema = z.coerce.number().int().min(1).max(65_535);
 const positiveIntegerSchema = z.coerce.number().int().positive();
+const booleanSchema = (defaultValue: "true" | "false") =>
+  z.enum(["true", "false"]).default(defaultValue).transform((value) => value === "true");
 const corsOriginSchema = z.string().min(1).refine(
   (value) =>
     value
@@ -51,9 +53,9 @@ const envSchema = z
     ]).default(""),
     PLATFORM_BOOTSTRAP_PASSWORD: z.union([z.literal(""), z.string().min(12).max(72)]).default(""),
     CORS_ORIGIN: corsOriginSchema.default("http://localhost:5173"),
-    COOKIE_SECURE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
-    BEARER_AUTH_ENABLED: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
-    OPENAPI_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+    COOKIE_SECURE: booleanSchema("false"),
+    BEARER_AUTH_ENABLED: booleanSchema("true"),
+    OPENAPI_ENABLED: booleanSchema("false"),
     LOGIN_RATE_LIMIT_WINDOW_MS: positiveIntegerSchema.default(900_000),
     LOGIN_RATE_LIMIT_MAX_REQUESTS: positiveIntegerSchema.default(10),
     CRIT_POST_API_URL: z.union([z.literal(""), z.url()]).default(""),
@@ -62,7 +64,22 @@ const envSchema = z
     CRIT_POST_API_BATCH_SIZE: positiveIntegerSchema.max(100).default(10),
     CRIT_POST_API_MAX_RETRIES: positiveIntegerSchema.default(5),
     CRIT_POST_API_REQUEST_TIMEOUT_MS: positiveIntegerSchema.default(10_000),
-    CRIT_POST_API_PROCESSING_TIMEOUT_MS: positiveIntegerSchema.default(60_000)
+    CRIT_POST_API_PROCESSING_TIMEOUT_MS: positiveIntegerSchema.default(60_000),
+    AI_ENABLED: booleanSchema("false"),
+    AI_RUNTIME: z.enum(["mock", "local"]).default("mock"),
+    AI_WORKER_TENANT_IDS: z.string().default(""),
+    AI_EMBEDDING_COMMAND: z.string().default(""),
+    AI_GENERATION_COMMAND: z.string().default(""),
+    AI_EMBEDDING_MODEL_ID: z.string().min(1).default("intfloat/multilingual-e5-small"),
+    AI_EMBEDDING_MODEL_REVISION: z.string().min(1).default("pinned-revision-required"),
+    AI_EMBEDDING_MODEL_SHA256: z.string().regex(/^[0-9a-f]{64}$/).default("0".repeat(64)),
+    AI_GENERATION_MODEL_ID: z.string().min(1).default("Qwen3-1.7B-Q4_K_M"),
+    AI_GENERATION_MODEL_REVISION: z.string().min(1).default("pinned-revision-required"),
+    AI_GENERATION_MODEL_SHA256: z.string().regex(/^[0-9a-f]{64}$/).default("0".repeat(64)),
+    AI_SIMILARITY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.70),
+    AI_JOB_TIMEOUT_MS: positiveIntegerSchema.default(240_000),
+    AI_POLL_INTERVAL_MS: positiveIntegerSchema.default(5_000),
+    AI_INTERACTION_RETENTION_DAYS: positiveIntegerSchema.default(90)
   })
   .superRefine((values, context) => {
     if (values.APP_ENV !== "local") {
@@ -79,6 +96,31 @@ const envSchema = z
 
       if (!values.COOKIE_SECURE) {
         context.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "Secure cookies are required outside local" });
+      }
+      if (values.AI_ENABLED && values.AI_RUNTIME !== "local") {
+        context.addIssue({
+          code: "custom",
+          path: ["AI_RUNTIME"],
+          message: "AI_RUNTIME=local is required outside local development"
+        });
+      }
+    }
+    if (values.APP_ENV === "production" && values.AI_ENABLED) {
+      context.addIssue({
+        code: "custom",
+        path: ["AI_ENABLED"],
+        message: "AI must remain disabled until production privacy policy is approved"
+      });
+    }
+    if (values.AI_ENABLED && values.AI_RUNTIME === "local") {
+      if (!values.AI_EMBEDDING_COMMAND.trim()) {
+        context.addIssue({ code: "custom", path: ["AI_EMBEDDING_COMMAND"], message: "Local embedding command is required" });
+      }
+      if (!values.AI_GENERATION_COMMAND.trim()) {
+        context.addIssue({ code: "custom", path: ["AI_GENERATION_COMMAND"], message: "Local generation command is required" });
+      }
+      if (!values.AI_WORKER_TENANT_IDS.trim()) {
+        context.addIssue({ code: "custom", path: ["AI_WORKER_TENANT_IDS"], message: "At least one worker tenant is required" });
       }
     }
   });
