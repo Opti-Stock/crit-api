@@ -33,7 +33,8 @@ export const createAppointmentSchema = z
     startsAt: z.iso.datetime(),
     endsAt: z.iso.datetime(),
     preSessionMinutes: z.coerce.number().int().min(0).default(0),
-    postSessionMinutes: z.coerce.number().int().min(0).default(0)
+    postSessionMinutes: z.coerce.number().int().min(0).default(0),
+    recommendationId: z.string().regex(/^[0-9a-f]{32}$/).optional()
   })
   .refine((value) => new Date(value.startsAt).getTime() < new Date(value.endsAt).getTime(), {
     message: "startsAt must be before endsAt",
@@ -51,6 +52,7 @@ export const updateAppointmentSchema = z
     endsAt: z.iso.datetime().optional(),
     preSessionMinutes: z.coerce.number().int().min(0).optional(),
     postSessionMinutes: z.coerce.number().int().min(0).optional(),
+    recommendationId: z.string().regex(/^[0-9a-f]{32}$/).optional(),
     status: z.enum(APPOINTMENT_STATUSES).optional()
   })
   .strict()
