@@ -48,3 +48,6 @@ GET /admin/audit-logs?entityType=users&entityId=<uuid>
 ```
 
 No se guardan valores sensibles ni contenido clinico en `audit_logs.metadata`.
+La API no tiene permiso de `INSERT` directo sobre la bitacora. Los motivos
+opcionales se registran mediante `record_admin_audit(...)`, una funcion de DB
+que valida tenant, actor, rol, entidad y operacion antes de escribir.

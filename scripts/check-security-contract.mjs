@@ -14,6 +14,16 @@ for (const name of await readdir(new URL("src/modules/", root))) {
   } catch {
     // Not every module has a conventionally named controller.
   }
+
+  const repository = new URL(`src/modules/${name}/${name}.repository.ts`, root);
+  try {
+    const source = await readFile(repository, "utf8");
+    if (/INSERT\s+INTO\s+(?:public\.)?audit_logs\b/i.test(source)) {
+      errors.push(`${name}: application repositories cannot insert directly into audit_logs`);
+    }
+  } catch {
+    // Not every module has a conventionally named repository.
+  }
 }
 
 const ignoredFiles = new Set([".env.local.example", ".env.render.example", ".env.production.example", ".env.example"]);

@@ -90,7 +90,7 @@ export class AdminCatalogsRepository {
          WHERE tenant_id = $1 AND clinic_id = $2 AND deleted_at IS NULL`,
         [tenantId, id]
       );
-      await this.insertAdminAuditLog(client, tenantId, actorId, "clinics", id, "soft_delete", reason);
+      await this.insertAdminAuditLog(client, "clinics", id, "soft_delete", reason);
     }, this.databasePool);
   }
 
@@ -105,7 +105,7 @@ export class AdminCatalogsRepository {
         [tenantId, id]
       );
       const clinic = requireRow(result.rows[0], "Clinic not found", "CLINIC_NOT_FOUND");
-      await this.insertAdminAuditLog(client, tenantId, actorId, "clinics", id, "restore", reason);
+      await this.insertAdminAuditLog(client, "clinics", id, "restore", reason);
       return clinic;
     }, this.databasePool);
   }
@@ -238,7 +238,7 @@ export class AdminCatalogsRepository {
         [tenantId, id]
       );
       requireRow(result.rows[0], "Room not found", "ROOM_NOT_FOUND");
-      await this.insertAdminAuditLog(client, tenantId, actorId, "rooms", id, "soft_delete", reason);
+      await this.insertAdminAuditLog(client, "rooms", id, "soft_delete", reason);
     }, this.databasePool);
   }
 
@@ -260,7 +260,7 @@ export class AdminCatalogsRepository {
         [tenantId, id]
       );
       const room = requireRow(result.rows[0], "Room not found or clinic is deleted", "ROOM_NOT_RESTORABLE");
-      await this.insertAdminAuditLog(client, tenantId, actorId, "rooms", id, "restore", reason);
+      await this.insertAdminAuditLog(client, "rooms", id, "restore", reason);
       return room;
     }, this.databasePool);
   }
@@ -520,26 +520,14 @@ export class AdminCatalogsRepository {
 
   private async insertAdminAuditLog(
     client: PoolClient,
-    tenantId: string,
-    actorId: string,
     entityType: string,
     entityId: string,
     operation: "soft_delete" | "restore",
     reason?: string
   ) {
     await client.query(
-      `INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id, metadata)
-       VALUES ($1, $2, 'UPDATE', $3, $4, $5::jsonb)`,
-      [
-        tenantId,
-        actorId,
-        entityType,
-        entityId,
-        JSON.stringify({
-          operation,
-          ...(reason ? { reason } : {})
-        })
-      ]
+      "SELECT record_admin_audit($1, $2, $3, $4)",
+      [entityType, entityId, operation, reason ?? null]
     );
   }
 }
