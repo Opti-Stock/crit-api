@@ -179,13 +179,22 @@ export class AppointmentsRepository {
       }
 
       try {
-        await this.assertNoScheduleConflict(client, tenantId, {
+        await this.lockSchedulingResources(client, tenantId, [
+          input.patientId,
+          input.collaboratorId,
+          input.roomId
+        ]);
+        await this.assertSlotAvailable(client, tenantId, {
           patientId: input.patientId,
           collaboratorId: input.collaboratorId,
           clinicId: input.clinicId,
           roomId: input.roomId,
+          appointmentTypeId: input.appointmentTypeId,
           startsAt: input.startsAt,
-          endsAt: input.endsAt
+          endsAt: input.endsAt,
+          preSessionMinutes: input.preSessionMinutes,
+          postSessionMinutes: input.postSessionMinutes,
+          recommendationId: input.recommendationId
         });
 
         const inserted = await client.query<{ id: string }>(
@@ -253,10 +262,14 @@ export class AppointmentsRepository {
           collaborator_id: string;
           clinic_id: string;
           room_id: string;
+          appointment_type_id: string;
           starts_at: string;
           ends_at: string;
+          pre_session_minutes: number;
+          post_session_minutes: number;
         }>(
-          `SELECT patient_id, collaborator_id, clinic_id, room_id, starts_at, ends_at
+          `SELECT patient_id, collaborator_id, clinic_id, room_id, appointment_type_id,
+                  starts_at, ends_at, pre_session_minutes, post_session_minutes
            FROM appointments
            WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
           [tenantId, appointmentId]
@@ -266,15 +279,25 @@ export class AppointmentsRepository {
           throw new NotFoundError("Appointment not found", "APPOINTMENT_NOT_FOUND");
         }
 
-        await this.assertNoScheduleConflict(client, tenantId, {
+        const nextSlot = {
           patientId: input.patientId ?? currentRow.patient_id,
           collaboratorId: input.collaboratorId ?? currentRow.collaborator_id,
           clinicId: input.clinicId ?? currentRow.clinic_id,
           roomId: input.roomId ?? currentRow.room_id,
+          appointmentTypeId: input.appointmentTypeId ?? currentRow.appointment_type_id,
           startsAt: input.startsAt ?? currentRow.starts_at,
           endsAt: input.endsAt ?? currentRow.ends_at,
+          preSessionMinutes: input.preSessionMinutes ?? currentRow.pre_session_minutes,
+          postSessionMinutes: input.postSessionMinutes ?? currentRow.post_session_minutes,
+          recommendationId: input.recommendationId,
           excludeAppointmentId: appointmentId
-        });
+        };
+        await this.lockSchedulingResources(client, tenantId, [
+          nextSlot.patientId,
+          nextSlot.collaboratorId,
+          nextSlot.roomId
+        ]);
+        await this.assertSlotAvailable(client, tenantId, nextSlot);
 
         const result = await client.query<{ id: string }>(
           `UPDATE appointments
@@ -325,7 +348,20 @@ export class AppointmentsRepository {
     );
   }
 
-  private async assertNoScheduleConflict(
+  private async lockSchedulingResources(
+    client: PoolClient,
+    tenantId: string,
+    resourceIds: string[]
+  ) {
+    for (const resourceId of [...new Set(resourceIds)].sort()) {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`${tenantId}:${resourceId}`]
+      );
+    }
+  }
+
+  private async assertSlotAvailable(
     client: PoolClient,
     tenantId: string,
     input: {
@@ -333,62 +369,182 @@ export class AppointmentsRepository {
       collaboratorId: string;
       clinicId: string;
       roomId: string;
+      appointmentTypeId: string;
       startsAt: string;
       endsAt: string;
+      preSessionMinutes: number;
+      postSessionMinutes: number;
+      recommendationId?: string;
       excludeAppointmentId?: string;
     }
   ) {
-    const values: unknown[] = [
-      tenantId,
-      input.startsAt,
-      input.endsAt,
-      input.patientId,
-      input.collaboratorId,
-      input.clinicId,
-      input.roomId
-    ];
-    const filters = [
-      "tenant_id = $1",
-      "deleted_at IS NULL",
-      "status <> 'cancelled'",
-      "starts_at < $3",
-      "ends_at > $2",
-      "(patient_id = $4 OR collaborator_id = $5 OR (clinic_id = $6 AND room_id = $7))"
-    ];
-
-    if (input.excludeAppointmentId) {
-      values.push(input.excludeAppointmentId);
-      filters.push(`id <> $${values.length}`);
-    }
-
-    const conflict = await client.query<{
-      id: string;
-      patient_id: string;
-      collaborator_id: string;
-      clinic_id: string;
-      room_id: string;
+    const check = await client.query<{
+      valid_references: boolean;
+      valid_duration_and_buffers: boolean;
+      inside_operating_hours: boolean;
+      inside_collaborator_availability: boolean;
+      has_block: boolean;
+      has_conflict: boolean;
     }>(
-      `SELECT id, patient_id, collaborator_id, clinic_id, room_id
-       FROM appointments
-       WHERE ${filters.join(" AND ")}
-       ORDER BY starts_at
-       LIMIT 1`,
-      values
+      `WITH slot AS (
+         SELECT
+           $1::uuid AS tenant_id, $2::uuid AS patient_id,
+           $3::uuid AS collaborator_id, $4::uuid AS clinic_id,
+           $5::uuid AS room_id, $6::uuid AS appointment_type_id,
+           $7::timestamptz AS starts_at, $8::timestamptz AS ends_at,
+           $9::integer AS pre_minutes, $10::integer AS post_minutes,
+           $11::uuid AS exclude_id
+       ),
+       configured AS (
+         SELECT slot.*, clinic.time_zone, appointment_type.default_duration_minutes,
+           appointment_type.default_pre_session_minutes,
+           appointment_type.default_post_session_minutes
+         FROM slot
+         JOIN patients patient
+           ON patient.tenant_id = slot.tenant_id AND patient.id = slot.patient_id
+          AND patient.deleted_at IS NULL
+         JOIN clinics clinic
+           ON clinic.tenant_id = slot.tenant_id AND clinic.id = slot.clinic_id
+          AND clinic.deleted_at IS NULL
+         JOIN rooms room
+           ON room.tenant_id = slot.tenant_id AND room.clinic_id = slot.clinic_id
+          AND room.id = slot.room_id AND room.deleted_at IS NULL
+         JOIN collaborator_clinics membership
+           ON membership.tenant_id = slot.tenant_id
+          AND membership.collaborator_id = slot.collaborator_id
+          AND membership.clinic_id = slot.clinic_id
+         JOIN appointment_types appointment_type
+           ON appointment_type.tenant_id = slot.tenant_id
+          AND appointment_type.id = slot.appointment_type_id
+          AND appointment_type.deleted_at IS NULL
+         JOIN clinic_appointment_types clinic_type
+           ON clinic_type.tenant_id = slot.tenant_id
+          AND clinic_type.clinic_id = slot.clinic_id
+          AND clinic_type.appointment_type_id = slot.appointment_type_id
+         JOIN collaborator_appointment_types collaborator_type
+           ON collaborator_type.tenant_id = slot.tenant_id
+          AND collaborator_type.collaborator_id = slot.collaborator_id
+          AND collaborator_type.appointment_type_id = slot.appointment_type_id
+         JOIN room_appointment_types room_type
+           ON room_type.tenant_id = slot.tenant_id
+          AND room_type.clinic_id = slot.clinic_id
+          AND room_type.room_id = slot.room_id
+          AND room_type.appointment_type_id = slot.appointment_type_id
+       )
+       SELECT
+         EXISTS (SELECT 1 FROM configured) AS valid_references,
+         EXISTS (
+           SELECT 1 FROM configured
+           WHERE ends_at - starts_at = make_interval(mins => default_duration_minutes)
+             AND pre_minutes = default_pre_session_minutes
+             AND post_minutes = default_post_session_minutes
+         ) AS valid_duration_and_buffers,
+         EXISTS (
+           SELECT 1 FROM configured
+           JOIN clinic_operating_hours hours
+             ON hours.tenant_id = configured.tenant_id
+            AND hours.clinic_id = configured.clinic_id
+            AND hours.weekday = EXTRACT(DOW FROM starts_at AT TIME ZONE time_zone)
+            AND hours.start_time <= (starts_at AT TIME ZONE time_zone)::time
+            AND hours.end_time >= (ends_at AT TIME ZONE time_zone)::time
+            AND hours.deleted_at IS NULL
+         ) AS inside_operating_hours,
+         EXISTS (
+           SELECT 1 FROM configured
+           JOIN collaborator_availability availability
+             ON availability.tenant_id = configured.tenant_id
+            AND availability.collaborator_id = configured.collaborator_id
+            AND availability.clinic_id = configured.clinic_id
+            AND availability.weekday = EXTRACT(DOW FROM starts_at AT TIME ZONE time_zone)
+            AND availability.valid_from <= (starts_at AT TIME ZONE time_zone)::date
+            AND (
+              availability.valid_to IS NULL
+              OR availability.valid_to >= (starts_at AT TIME ZONE time_zone)::date
+            )
+            AND availability.start_time <= (starts_at AT TIME ZONE time_zone)::time
+            AND availability.end_time >= (ends_at AT TIME ZONE time_zone)::time
+            AND availability.deleted_at IS NULL
+         ) AS inside_collaborator_availability,
+         EXISTS (
+           SELECT 1 FROM configured
+           JOIN scheduling_blocks block
+             ON block.tenant_id = configured.tenant_id
+            AND block.clinic_id = configured.clinic_id
+            AND block.deleted_at IS NULL
+            AND (block.collaborator_id IS NULL OR block.collaborator_id = configured.collaborator_id)
+            AND (block.room_id IS NULL OR block.room_id = configured.room_id)
+            AND block.starts_at < configured.ends_at + make_interval(mins => configured.post_minutes)
+            AND block.ends_at > configured.starts_at - make_interval(mins => configured.pre_minutes)
+         ) AS has_block,
+         EXISTS (
+           SELECT 1 FROM configured
+           JOIN appointments appointment
+             ON appointment.tenant_id = configured.tenant_id
+            AND appointment.deleted_at IS NULL
+            AND appointment.status <> 'cancelled'
+            AND (configured.exclude_id IS NULL OR appointment.id <> configured.exclude_id)
+            AND (
+              appointment.patient_id = configured.patient_id
+              OR appointment.collaborator_id = configured.collaborator_id
+              OR (
+                appointment.clinic_id = configured.clinic_id
+                AND appointment.room_id = configured.room_id
+              )
+            )
+            AND appointment.starts_at - make_interval(mins => appointment.pre_session_minutes)
+              < configured.ends_at + make_interval(mins => configured.post_minutes)
+            AND appointment.ends_at + make_interval(mins => appointment.post_session_minutes)
+              > configured.starts_at - make_interval(mins => configured.pre_minutes)
+         ) AS has_conflict`,
+      [
+        tenantId,
+        input.patientId,
+        input.collaboratorId,
+        input.clinicId,
+        input.roomId,
+        input.appointmentTypeId,
+        input.startsAt,
+        input.endsAt,
+        input.preSessionMinutes,
+        input.postSessionMinutes,
+        input.excludeAppointmentId ?? null
+      ]
     );
-    const row = conflict.rows[0];
-    if (!row) return;
-
-    const resource =
-      row.patient_id === input.patientId
-        ? "patient"
-        : row.collaborator_id === input.collaboratorId
-          ? "collaborator"
-          : "room";
-
-    throw new ConflictError(
-      `Appointment overlaps an existing ${resource} appointment`,
-      "APPOINTMENT_TIME_CONFLICT"
+    const result = check.rows[0]!;
+    const stale = () => new ConflictError(
+      "The recommended appointment is no longer available",
+      "APPOINTMENT_RECOMMENDATION_STALE"
     );
+
+    if (!result.valid_references) {
+      if (input.recommendationId) throw stale();
+      throw new BadRequestError(
+        "Appointment resources are inactive or incompatible",
+        "INVALID_APPOINTMENT_CONFIGURATION"
+      );
+    }
+    if (!result.valid_duration_and_buffers) {
+      throw new BadRequestError(
+        "Duration and buffers must match the appointment type",
+        "INVALID_APPOINTMENT_DURATION"
+      );
+    }
+    if (!result.inside_operating_hours || !result.inside_collaborator_availability) {
+      if (input.recommendationId) throw stale();
+      throw new BadRequestError(
+        "Appointment is outside clinic or collaborator hours",
+        "APPOINTMENT_OUTSIDE_AVAILABILITY"
+      );
+    }
+    if (result.has_block || result.has_conflict) {
+      if (input.recommendationId) throw stale();
+      throw new ConflictError(
+        result.has_block
+          ? "Appointment overlaps a scheduling block"
+          : "Appointment overlaps an existing appointment",
+        result.has_block ? "APPOINTMENT_BLOCKED" : "APPOINTMENT_TIME_CONFLICT"
+      );
+    }
   }
 
   private async findByFilters(client: PoolClient, filters: string[], values: unknown[]) {
