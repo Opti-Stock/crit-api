@@ -64,6 +64,16 @@ check-in API    http://localhost:3002/health
 super-admin API http://localhost:3003/health
 ```
 
+El worker de IA real es opcional y no se inicia con el compose normal. Después
+de fijar las cinco variables de build descritas en `docs/local-ai.md`, se activa
+sin publicar puertos:
+
+```bash
+docker compose --profile ai build ai-worker
+docker compose --profile ai up -d ai-worker
+docker compose ps ai-worker
+```
+
 El compose espera que la base de datos ya exista. Para Docker local usa por default:
 
 ```txt
@@ -88,6 +98,11 @@ node dist/apps/admin-api/server.js
 node dist/apps/checkin-api/server.js
 node dist/apps/super-admin-api/server.js
 ```
+
+Crear además un background worker privado desde `Dockerfile.ai`. No asignarle
+dominio ni puerto público. Sus cinco argumentos de build deben ser revisiones y
+hashes inmutables verificados; `AI_ENABLED` permanece en `false` hasta completar
+el smoke test de la imagen y la evaluación con datos ficticios.
 
 Configurar el puerto correspondiente en variables de entorno:
 
@@ -117,4 +132,5 @@ npm run build
 npm test
 docker compose config
 docker compose build
+docker compose --profile ai config
 ```

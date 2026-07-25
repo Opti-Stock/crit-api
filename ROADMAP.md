@@ -4,6 +4,7 @@
 
 - [x] Add protected summary and evidence-backed question contracts.
 - [x] Add a single-job local AI worker with exact hybrid retrieval.
+- [x] Add an opt-in Docker Compose profile for the private real-model worker.
 - Validate the pinned real-model image and fictitious evaluation dataset.
 - Measure Recall@12 and source support before enabling AI in the Render demo.
 - [x] Generate deterministic, explainable appointment recommendations.

@@ -88,6 +88,47 @@ services:
       retries: 5
       start_period: 10s
 
+  ai-worker:
+    profiles:
+      - ai
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+      args:
+        LLAMA_CPP_COMMIT: ${LLAMA_CPP_COMMIT:-}
+        E5_MODEL_REVISION: ${E5_MODEL_REVISION:-}
+        E5_MODEL_SHA256: ${E5_MODEL_SHA256:-}
+        QWEN_MODEL_REVISION: ${QWEN_MODEL_REVISION:-}
+        QWEN_MODEL_SHA256: ${QWEN_MODEL_SHA256:-}
+    image: crit-ai-worker:local
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      APP_ENV: local
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql://crit_app:crit_app@crit-db:5432/crit_db}
+      PLATFORM_DATABASE_URL: ${API_PLATFORM_DATABASE_URL:-postgresql://crit_platform_app:crit_platform_app@crit-db:5432/crit_db}
+      AI_ENABLED: "true"
+      AI_RUNTIME: local
+      AI_WORKER_TENANT_IDS: ${AI_WORKER_TENANT_IDS:-}
+      AI_EMBEDDING_COMMAND: python /app/ai-runtime/ai_runtime.py embed
+      AI_GENERATION_COMMAND: python /app/ai-runtime/ai_runtime.py generate
+      AI_EMBEDDING_MODEL_ID: intfloat/multilingual-e5-small
+      AI_EMBEDDING_MODEL_REVISION: ${E5_MODEL_REVISION:-}
+      AI_EMBEDDING_MODEL_SHA256: ${E5_MODEL_SHA256:-}
+      AI_GENERATION_MODEL_ID: Qwen3-1.7B-Q4_K_M
+      AI_GENERATION_MODEL_REVISION: ${QWEN_MODEL_REVISION:-}
+      AI_GENERATION_MODEL_SHA256: ${QWEN_MODEL_SHA256:-}
+    networks:
+      - crit-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
 networks:
   crit-db:
     external: true
