@@ -51,6 +51,34 @@ Para reindexar notas visibles para un usuario autorizado:
 npm run ai:reindex -- --tenant TENANT_UUID --user AUTHORIZED_USER_UUID
 ```
 
+## Perfil Docker Compose
+
+El perfil `ai` es opt-in: el arranque normal de las cuatro API no descarga ni
+carga modelos. Antes de construirlo, copia los cinco pins verificados del
+registro de modelos a tu `.env`:
+
+```txt
+LLAMA_CPP_COMMIT=<commit completo>
+E5_MODEL_REVISION=<revision inmutable>
+E5_MODEL_SHA256=<sha256 verificado>
+QWEN_MODEL_REVISION=<revision inmutable>
+QWEN_MODEL_SHA256=<sha256 verificado>
+AI_WORKER_TENANT_IDS=<tenant demo>
+```
+
+Con `crit-db` ya levantado y migrado:
+
+```bash
+docker compose --profile ai build ai-worker
+docker compose --profile ai up -d ai-worker
+docker compose ps ai-worker
+```
+
+El contenedor no publica puertos. Su healthcheck comprueba que el proceso siga
+vivo y el estado funcional se observa mediante el heartbeat que escribe en
+PostgreSQL por tenant. Si falta un pin o un hash no coincide, la imagen falla
+durante el build.
+
 ## Imagen de Render
 
 Construir `Dockerfile.ai` pasando valores fijados:
