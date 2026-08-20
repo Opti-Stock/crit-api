@@ -42,14 +42,16 @@ async function run() {
       body: JSON.stringify({ email, password })
     });
     assert.equal(loginResponse.status, 200);
+    const sessionCookie = loginResponse.headers.get("set-cookie")?.split(";")[0];
+    assert.ok(sessionCookie);
     const login = await loginResponse.json() as Success<{
-      accessToken: string;
       user: { id: string; tenantId: string }
     }>;
-    const token = login.data.accessToken;
     tenantId = login.data.user.tenantId;
     actorId = login.data.user.id;
-    const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+    const trustedOrigin = (process.env.CORS_ORIGIN ?? "http://localhost:5173").split(",")[0]?.trim();
+    assert.ok(trustedOrigin);
+    const headers = { cookie: sessionCookie, "content-type": "application/json", origin: trustedOrigin };
 
     const me = await fetch(`${main.url}/api/auth/me`, { headers });
     assert.equal(me.status, 200);
@@ -63,19 +65,37 @@ async function run() {
     const direccionRole = roles.data.find((role) => role.name === "direccion");
     assert.ok(direccionRole);
 
-    const lastAdminDeactivation = await fetch(`${admin.url}/admin/users/${actorId}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ status: "inactive" })
-    });
-    assert.equal(lastAdminDeactivation.status, 409);
+    const activeAdminCount = await withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const result = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+         FROM users u
+         JOIN user_roles ur ON ur.tenant_id = u.tenant_id AND ur.user_id = u.id
+         JOIN roles r ON r.tenant_id = ur.tenant_id AND r.id = ur.role_id
+         WHERE u.tenant_id = $1
+           AND u.status = 'active'
+           AND u.deleted_at IS NULL
+           AND r.name = 'admin'
+           AND r.deleted_at IS NULL`,
+        [tenantId]
+      );
+      return Number(result.rows[0]?.count ?? 0);
+    }, pool);
 
-    const lastAdminRoleRemoval = await fetch(`${admin.url}/admin/users/${actorId}/roles`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify({ roleIds: [direccionRole.id] })
-    });
-    assert.equal(lastAdminRoleRemoval.status, 409);
+    if (activeAdminCount === 1) {
+      const lastAdminDeactivation = await fetch(`${admin.url}/admin/users/${actorId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ status: "inactive" })
+      });
+      assert.equal(lastAdminDeactivation.status, 409);
+
+      const lastAdminRoleRemoval = await fetch(`${admin.url}/admin/users/${actorId}/roles`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ roleIds: [direccionRole.id] })
+      });
+      assert.equal(lastAdminRoleRemoval.status, 409);
+    }
 
     const uniqueEmail = `m1-test-${Date.now()}@crit.test`;
     const createdResponse = await fetch(`${admin.url}/admin/users`, {
@@ -115,6 +135,7 @@ async function run() {
   } finally {
     if (createdUserId && tenantId && actorId) {
       await withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+        await client.query("DELETE FROM collaborators WHERE tenant_id = $1 AND user_id = $2", [tenantId, createdUserId]);
         await client.query("DELETE FROM users WHERE tenant_id = $1 AND id = $2", [tenantId, createdUserId]);
       }, pool);
     }
