@@ -33,6 +33,11 @@ for (const file of await readdir(root)) {
   }
 }
 
+const aiAssistanceRoutes = await readFile(new URL("src/modules/ai-assistance/ai-assistance.routes.ts", root), "utf8");
+if (/aiAssistanceRouter\.use\([\s\S]*requireRoles/.test(aiAssistanceRoutes)) {
+  errors.push("ai-assistance: route-level roles must not gate unrelated /api routes");
+}
+
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
