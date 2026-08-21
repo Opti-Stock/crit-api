@@ -2,8 +2,12 @@ FROM node:20-alpine AS deps
 
 WORKDIR /app
 
+COPY docker/certs/ /tmp/local-certs/
 COPY package*.json ./
-RUN npm ci
+RUN if [ -f /tmp/local-certs/local-ca.crt ]; then \
+      export NODE_EXTRA_CA_CERTS=/tmp/local-certs/local-ca.crt; \
+    fi; \
+    npm ci
 
 FROM deps AS build
 
@@ -16,8 +20,12 @@ FROM node:20-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
+COPY docker/certs/ /tmp/local-certs/
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN if [ -f /tmp/local-certs/local-ca.crt ]; then \
+      export NODE_EXTRA_CA_CERTS=/tmp/local-certs/local-ca.crt; \
+    fi; \
+    npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 

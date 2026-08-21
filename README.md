@@ -29,6 +29,17 @@ API no crea tablas ni ejecuta DDL al iniciar.
 La guía canónica con comandos en orden, modo híbrido y modo Docker está en
 [`docs/local-development.md`](docs/local-development.md).
 
+Si `docker compose up --build` falla en `npm ci` con
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, genera primero un bundle local de
+certificados de Windows:
+
+```powershell
+.\scripts\export-windows-ca-bundle.ps1
+docker compose up --build --wait
+```
+
+El archivo `docker/certs/local-ca.crt` es local y no debe subirse a git.
+
 1. Levantar PostgreSQL desde `crit-db`:
 
    ```powershell
