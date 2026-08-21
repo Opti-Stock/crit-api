@@ -7,8 +7,10 @@ import type {
   CreateCollaboratorInput,
   CreatePatientInput,
   CreateRoomInput,
-  ListAdminCatalogsInput,
+  ListAppointmentTypesInput,
   ListAuditLogsInput,
+  ListClinicsInput,
+  ListRoomsInput,
   UpdateAppointmentTypeInput,
   UpdateClinicInput,
   UpdateCollaboratorInput,
@@ -19,7 +21,7 @@ import type {
 export class AdminCatalogsService {
   constructor(private readonly repository = new AdminCatalogsRepository()) {}
 
-  listClinics(context: AuthenticatedRequestContext, input: ListAdminCatalogsInput) {
+  listClinics(context: AuthenticatedRequestContext, input: ListClinicsInput) {
     return this.repository.listClinics(context.tenantId, context.userId, input);
   }
   createClinic(context: AuthenticatedRequestContext, input: CreateClinicInput) {
@@ -45,7 +47,7 @@ export class AdminCatalogsService {
     return this.repository.updatePatient(context.tenantId, context.userId, id, input);
   }
 
-  listRooms(context: AuthenticatedRequestContext, input: ListAdminCatalogsInput) {
+  listRooms(context: AuthenticatedRequestContext, input: ListRoomsInput) {
     return this.repository.listRooms(context.tenantId, context.userId, input);
   }
   createRoom(context: AuthenticatedRequestContext, input: CreateRoomInput) {
@@ -61,8 +63,8 @@ export class AdminCatalogsService {
     return this.repository.restoreRoom(context.tenantId, context.userId, id, input.reason);
   }
 
-  listAppointmentTypes(context: AuthenticatedRequestContext) {
-    return this.repository.listAppointmentTypes(context.tenantId, context.userId);
+  listAppointmentTypes(context: AuthenticatedRequestContext, input: ListAppointmentTypesInput) {
+    return this.repository.listAppointmentTypes(context.tenantId, context.userId, input);
   }
   createAppointmentType(context: AuthenticatedRequestContext, input: CreateAppointmentTypeInput) {
     return this.repository.createAppointmentType(context.tenantId, context.userId, input);

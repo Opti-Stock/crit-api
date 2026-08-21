@@ -9,8 +9,10 @@ import type {
   CreateCollaboratorInput,
   CreatePatientInput,
   CreateRoomInput,
-  ListAdminCatalogsInput,
+  ListAppointmentTypesInput,
   ListAuditLogsInput,
+  ListClinicsInput,
+  ListRoomsInput,
   UpdateAppointmentTypeInput,
   UpdateClinicInput,
   UpdateCollaboratorInput,
@@ -18,19 +20,61 @@ import type {
   UpdateRoomInput
 } from "./admin-catalogs.validation.js";
 
+const CLINIC_SORT_COLUMNS: Record<ListClinicsInput["sortBy"], string> = {
+  name: "name",
+  specialization: "specialization",
+  capacity: "capacity",
+  status: "status"
+};
+
+const ROOM_SORT_COLUMNS: Record<ListRoomsInput["sortBy"], string> = {
+  clinicName: "c.name",
+  name: "r.name",
+  capacity: "r.capacity",
+  status: "r.status"
+};
+
+const APPOINTMENT_TYPE_SORT_COLUMNS: Record<ListAppointmentTypesInput["sortBy"], string> = {
+  name: "name",
+  defaultDurationMinutes: "default_duration_minutes",
+  defaultPreSessionMinutes: "default_pre_session_minutes",
+  defaultPostSessionMinutes: "default_post_session_minutes"
+};
+
 export class AdminCatalogsRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
-  listClinics(tenantId: string, actorId: string, input: ListAdminCatalogsInput = { includeDeleted: false }) {
+  listClinics(tenantId: string, actorId: string, input: ListClinicsInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const filters = ["tenant_id = $1"];
+      const values: unknown[] = [tenantId];
+
+      if (!input.includeDeleted) filters.push("deleted_at IS NULL");
+      if (input.search) {
+        values.push(`%${input.search}%`);
+        filters.push(`(name ILIKE $${values.length} OR specialization ILIKE $${values.length})`);
+      }
+      if (input.status) {
+        values.push(input.status);
+        filters.push(`status = $${values.length}`);
+      }
+
+      const where = filters.join(" AND ");
+      const count = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM clinics WHERE ${where}`,
+        values
+      );
+      values.push(input.pageSize, (input.page - 1) * input.pageSize);
+      const sortDirection = input.sortDir === "desc" ? "DESC" : "ASC";
       const result = await client.query(
         `SELECT id, name, specialization, capacity, coordinator_id AS "coordinatorId", status, deleted_at AS "deletedAt"
          FROM clinics
-         WHERE tenant_id = $1 ${input.includeDeleted ? "" : "AND deleted_at IS NULL"}
-         ORDER BY name`,
-        [tenantId]
+         WHERE ${where}
+         ORDER BY ${CLINIC_SORT_COLUMNS[input.sortBy]} ${sortDirection} NULLS LAST, id
+         LIMIT $${values.length - 1} OFFSET $${values.length}`,
+        values
       );
-      return result.rows;
+      return { clinics: result.rows, total: Number(count.rows[0]?.count ?? 0) };
     }, this.databasePool);
   }
 
@@ -177,17 +221,45 @@ export class AdminCatalogsRepository {
     }, this.databasePool);
   }
 
-  listRooms(tenantId: string, actorId: string, input: ListAdminCatalogsInput = { includeDeleted: false }) {
+  listRooms(tenantId: string, actorId: string, input: ListRoomsInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const filters = ["r.tenant_id = $1"];
+      const values: unknown[] = [tenantId];
+
+      if (!input.includeDeleted) filters.push("r.deleted_at IS NULL AND c.deleted_at IS NULL");
+      if (input.search) {
+        values.push(`%${input.search}%`);
+        filters.push(`(r.name ILIKE $${values.length} OR c.name ILIKE $${values.length})`);
+      }
+      if (input.clinicId) {
+        values.push(input.clinicId);
+        filters.push(`r.clinic_id = $${values.length}`);
+      }
+      if (input.status) {
+        values.push(input.status);
+        filters.push(`r.status = $${values.length}`);
+      }
+
+      const where = filters.join(" AND ");
+      const count = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+         FROM rooms r
+         JOIN clinics c ON c.tenant_id = r.tenant_id AND c.id = r.clinic_id
+         WHERE ${where}`,
+        values
+      );
+      values.push(input.pageSize, (input.page - 1) * input.pageSize);
+      const sortDirection = input.sortDir === "desc" ? "DESC" : "ASC";
       const result = await client.query(
         `SELECT r.id, r.clinic_id AS "clinicId", c.name AS "clinicName", r.name, r.capacity, r.status, r.deleted_at AS "deletedAt"
          FROM rooms r
          JOIN clinics c ON c.tenant_id = r.tenant_id AND c.id = r.clinic_id
-         WHERE r.tenant_id = $1 ${input.includeDeleted ? "" : "AND r.deleted_at IS NULL AND c.deleted_at IS NULL"}
-         ORDER BY c.name, r.name`,
-        [tenantId]
+         WHERE ${where}
+         ORDER BY ${ROOM_SORT_COLUMNS[input.sortBy]} ${sortDirection} NULLS LAST, r.id
+         LIMIT $${values.length - 1} OFFSET $${values.length}`,
+        values
       );
-      return result.rows;
+      return { rooms: result.rows, total: Number(count.rows[0]?.count ?? 0) };
     }, this.databasePool);
   }
 
@@ -265,19 +337,35 @@ export class AdminCatalogsRepository {
     }, this.databasePool);
   }
 
-  listAppointmentTypes(tenantId: string, actorId: string) {
+  listAppointmentTypes(tenantId: string, actorId: string, input: ListAppointmentTypesInput) {
     return withTenantTransaction({ tenantId, userId: actorId }, async (client) => {
+      const filters = ["tenant_id = $1", "deleted_at IS NULL"];
+      const values: unknown[] = [tenantId];
+
+      if (input.search) {
+        values.push(`%${input.search}%`);
+        filters.push(`name ILIKE $${values.length}`);
+      }
+
+      const where = filters.join(" AND ");
+      const count = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM appointment_types WHERE ${where}`,
+        values
+      );
+      values.push(input.pageSize, (input.page - 1) * input.pageSize);
+      const sortDirection = input.sortDir === "desc" ? "DESC" : "ASC";
       const result = await client.query(
         `SELECT id, name,
                 default_duration_minutes AS "defaultDurationMinutes",
                 default_pre_session_minutes AS "defaultPreSessionMinutes",
                 default_post_session_minutes AS "defaultPostSessionMinutes"
          FROM appointment_types
-         WHERE tenant_id = $1 AND deleted_at IS NULL
-         ORDER BY name`,
-        [tenantId]
+         WHERE ${where}
+         ORDER BY ${APPOINTMENT_TYPE_SORT_COLUMNS[input.sortBy]} ${sortDirection}, id
+         LIMIT $${values.length - 1} OFFSET $${values.length}`,
+        values
       );
-      return result.rows;
+      return { appointmentTypes: result.rows, total: Number(count.rows[0]?.count ?? 0) };
     }, this.databasePool);
   }
 

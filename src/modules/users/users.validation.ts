@@ -16,7 +16,10 @@ export const listUsersSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().max(255).optional(),
   status: z.enum(["active", "inactive"]).optional(),
-  includeDeleted: z.coerce.boolean().default(false)
+  roleId: postgresUuid.optional(),
+  includeDeleted: z.coerce.boolean().default(false),
+  sortBy: z.enum(["fullName", "email", "status"]).default("fullName"),
+  sortDir: z.enum(["asc", "desc"]).default("asc")
 });
 export const createUserSchema = z.object({
   fullName: z.string().trim().min(1).max(255),
