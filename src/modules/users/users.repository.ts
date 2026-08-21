@@ -35,6 +35,12 @@ interface UserRow {
   clinic_access: UserDetail["clinicAccess"];
 }
 
+const USER_SORT_COLUMNS: Record<ListUsersInput["sortBy"], string> = {
+  fullName: "u.full_name",
+  email: "u.email",
+  status: "u.status"
+};
+
 export class UsersRepository {
   constructor(private readonly databasePool: Pool = pool) {}
 
@@ -51,12 +57,28 @@ export class UsersRepository {
         values.push(input.status);
         filters.push(`u.status = $${values.length}`);
       }
+      if (input.roleId) {
+        values.push(input.roleId);
+        filters.push(`EXISTS (
+          SELECT 1
+          FROM user_roles role_filter
+          JOIN roles role
+            ON role.tenant_id = role_filter.tenant_id
+           AND role.id = role_filter.role_id
+           AND role.deleted_at IS NULL
+          WHERE role_filter.tenant_id = u.tenant_id
+            AND role_filter.user_id = u.id
+            AND role_filter.role_id = $${values.length}
+        )`);
+      }
       const where = filters.join(" AND ");
       const count = await client.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM users u WHERE ${where}`,
         values
       );
       values.push(input.pageSize, (input.page - 1) * input.pageSize);
+      const sortColumn = USER_SORT_COLUMNS[input.sortBy];
+      const sortDirection = input.sortDir === "desc" ? "DESC" : "ASC";
       const rows = await client.query<UserRow>(
         `SELECT u.id, u.full_name, u.email, u.status, u.last_login_at, u.deleted_at,
           COALESCE((SELECT jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name) ORDER BY r.name)
@@ -64,7 +86,7 @@ export class UsersRepository {
             WHERE ur.tenant_id = u.tenant_id AND ur.user_id = u.id AND r.deleted_at IS NULL), '[]') AS roles,
           '[]'::jsonb AS clinic_access
          FROM users u WHERE ${where}
-         ORDER BY u.full_name, u.id LIMIT $${values.length - 1} OFFSET $${values.length}`,
+         ORDER BY ${sortColumn} ${sortDirection}, u.id LIMIT $${values.length - 1} OFFSET $${values.length}`,
         values
       );
       return { users: rows.rows.map(mapSummary), total: Number(count.rows[0]?.count ?? 0) };

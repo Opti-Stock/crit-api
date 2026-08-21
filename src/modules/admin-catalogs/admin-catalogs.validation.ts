@@ -14,10 +14,38 @@ const optionalEmail = z
 const status = z.enum(["active", "inactive"]).optional();
 const positiveInt = z.coerce.number().int().positive();
 const nonNegativeInt = z.coerce.number().int().min(0);
+const sortDir = z.enum(["asc", "desc"]).default("asc");
+const paginatedListSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().trim().max(255).optional()
+});
 
 export const idParamsSchema = z.object({ id: postgresUuid });
 export const listAdminCatalogsSchema = z.object({
   includeDeleted: z.coerce.boolean().default(false)
+});
+export const listClinicsSchema = paginatedListSchema.extend({
+  status,
+  includeDeleted: z.coerce.boolean().default(false),
+  sortBy: z.enum(["name", "specialization", "capacity", "status"]).default("name"),
+  sortDir
+});
+export const listRoomsSchema = paginatedListSchema.extend({
+  clinicId: postgresUuid.optional(),
+  status,
+  includeDeleted: z.coerce.boolean().default(false),
+  sortBy: z.enum(["clinicName", "name", "capacity", "status"]).default("clinicName"),
+  sortDir
+});
+export const listAppointmentTypesSchema = paginatedListSchema.extend({
+  sortBy: z.enum([
+    "name",
+    "defaultDurationMinutes",
+    "defaultPreSessionMinutes",
+    "defaultPostSessionMinutes"
+  ]).default("name"),
+  sortDir
 });
 export const listAuditLogsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -82,6 +110,9 @@ export const updateCollaboratorSchema = createCollaboratorSchema
 
 export type CreateClinicInput = z.output<typeof createClinicSchema>;
 export type ListAdminCatalogsInput = z.output<typeof listAdminCatalogsSchema>;
+export type ListClinicsInput = z.output<typeof listClinicsSchema>;
+export type ListRoomsInput = z.output<typeof listRoomsSchema>;
+export type ListAppointmentTypesInput = z.output<typeof listAppointmentTypesSchema>;
 export type ListAuditLogsInput = z.output<typeof listAuditLogsSchema>;
 export type AdminReasonInput = z.output<typeof adminReasonSchema>;
 export type UpdateClinicInput = z.output<typeof updateClinicSchema>;

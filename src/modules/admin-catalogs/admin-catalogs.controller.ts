@@ -11,8 +11,10 @@ import {
   createPatientSchema,
   createRoomSchema,
   idParamsSchema,
-  listAdminCatalogsSchema,
+  listAppointmentTypesSchema,
   listAuditLogsSchema,
+  listClinicsSchema,
+  listRoomsSchema,
   updateAppointmentTypeSchema,
   updateClinicSchema,
   updateCollaboratorSchema,
@@ -24,7 +26,14 @@ export class AdminCatalogsController {
   constructor(private readonly service = new AdminCatalogsService()) {}
 
   readonly listClinics: RequestHandler = async (request, response) => {
-    sendSuccess(response, await this.service.listClinics(request.auth!, parseWithSchema(listAdminCatalogsSchema, request.query)));
+    const input = parseWithSchema(listClinicsSchema, request.query);
+    const result = await this.service.listClinics(request.auth!, input);
+    sendSuccess(response, result.clinics, 200, {
+      page: input.page,
+      pageSize: input.pageSize,
+      total: result.total,
+      totalPages: Math.ceil(result.total / input.pageSize)
+    });
   };
   readonly createClinic: RequestHandler = async (request, response) => {
     sendSuccess(response, await this.service.createClinic(request.auth!, parseWithSchema(createClinicSchema, request.body)), 201);
@@ -57,7 +66,14 @@ export class AdminCatalogsController {
   };
 
   readonly listRooms: RequestHandler = async (request, response) => {
-    sendSuccess(response, await this.service.listRooms(request.auth!, parseWithSchema(listAdminCatalogsSchema, request.query)));
+    const input = parseWithSchema(listRoomsSchema, request.query);
+    const result = await this.service.listRooms(request.auth!, input);
+    sendSuccess(response, result.rooms, 200, {
+      page: input.page,
+      pageSize: input.pageSize,
+      total: result.total,
+      totalPages: Math.ceil(result.total / input.pageSize)
+    });
   };
   readonly createRoom: RequestHandler = async (request, response) => {
     sendSuccess(response, await this.service.createRoom(request.auth!, parseWithSchema(createRoomSchema, request.body)), 201);
@@ -79,7 +95,14 @@ export class AdminCatalogsController {
   };
 
   readonly listAppointmentTypes: RequestHandler = async (request, response) => {
-    sendSuccess(response, await this.service.listAppointmentTypes(request.auth!));
+    const input = parseWithSchema(listAppointmentTypesSchema, request.query);
+    const result = await this.service.listAppointmentTypes(request.auth!, input);
+    sendSuccess(response, result.appointmentTypes, 200, {
+      page: input.page,
+      pageSize: input.pageSize,
+      total: result.total,
+      totalPages: Math.ceil(result.total / input.pageSize)
+    });
   };
   readonly createAppointmentType: RequestHandler = async (request, response) => {
     sendSuccess(response, await this.service.createAppointmentType(request.auth!, parseWithSchema(createAppointmentTypeSchema, request.body)), 201);

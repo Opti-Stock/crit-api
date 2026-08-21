@@ -22,8 +22,16 @@ test("admin catalog integration supports clinic create delete and restore", { sk
   });
 
   await repository.softDeleteClinic(tenantId, actorId, created.id, "integration delete");
-  const deleted = await repository.listClinics(tenantId, actorId, { includeDeleted: true });
-  assert.ok(deleted.some((clinic) => clinic.id === created.id && clinic.deletedAt));
+  const deleted = await repository.listClinics(tenantId, actorId, {
+    page: 1,
+    pageSize: 20,
+    search: name,
+    includeDeleted: true,
+    sortBy: "name",
+    sortDir: "asc"
+  });
+  assert.equal(deleted.total, 1);
+  assert.ok(deleted.clinics.some((clinic) => clinic.id === created.id && clinic.deletedAt));
 
   const restored = await repository.restoreClinic(tenantId, actorId, created.id, "integration restore");
   assert.equal(restored.deletedAt, null);
